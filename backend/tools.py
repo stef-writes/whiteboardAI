@@ -3,6 +3,7 @@ import os
 import json
 from fastapi import HTTPException
 from dotenv import load_dotenv
+from structure_analyzer import analyze_concepts_and_structure  # absolute import
 
 # Load environment variables
 load_dotenv()
@@ -32,6 +33,10 @@ Respond with ONLY the type, no other text.
     return response.choices[0].message.content.strip().lower()
 
 def generate_diagram(prompt: str) -> dict:
+    # Step 1: Preprocess the prompt to get structure hints
+    structure_hints = analyze_concepts_and_structure(prompt)
+
+    # Step 2: Classify diagram type
     diagram_type = classify_prompt(prompt)
 
     generators = {
@@ -43,12 +48,15 @@ def generate_diagram(prompt: str) -> dict:
     if diagram_type not in generators:
         raise HTTPException(status_code=400, detail=f"Unknown diagram type: {diagram_type}")
 
+    # Step 3: Pass structure hints into the generator (optional; see below)
     return {
         "type": diagram_type,
-        "data": generators[diagram_type](prompt)
+        "structure": structure_hints,
+        "data": generators[diagram_type](prompt, structure_hints)  # <- update generators to accept hints
     }
 
-def generate_mindmap(prompt: str) -> dict:
+def generate_mindmap(prompt: str, hints: dict = None) -> dict:
+    # ... use hints in the future if needed ...
     system = """You are an expert mind map generation engine.
 Your goal is to create a well-structured and informative mind map in JSON format.
 
@@ -82,7 +90,8 @@ Instructions:
 """
     return _ask_llm(prompt, system)
 
-def generate_flowchart(prompt: str) -> dict:
+def generate_flowchart(prompt: str, hints: dict = None) -> dict:
+    # ... use hints in the future if needed ...
     system = """You are an expert flowchart generation engine.
 Your goal is to create a clear, logical, and complete flowchart in JSON format.
 
@@ -131,58 +140,59 @@ Instructions:
 """
     return _ask_llm(prompt, system)
 
-def generate_concept_map(prompt: str) -> dict:
-    system = """You are an expert concept map generation engine.
+def generate_concept_map(prompt: str, hints: dict = None) -> dict:
+    import json
+    cluster_hint = ""
+    flow_hint = ""
+    anchor_hint = ""
+    prune_hint = ""
+
+    if hints:
+        if "clusters" in hints:
+            cluster_hint = "\nOrganize concepts into these groups:\n" + json.dumps(hints["clusters"], indent=2)
+        if "flow_direction" in hints:
+            flow_hint = f"\nPrefer a {hints['flow_direction']} layout for visual clarity."
+        if "anchor_node" in hints:
+            anchor_hint = f'\nTry to use "{hints["anchor_node"]}" as the central concept if appropriate.'
+        if "relationship_pruning" in hints and "collapse" in hints["relationship_pruning"]:
+            prunes = ", ".join(hints["relationship_pruning"]["collapse"])
+            prune_hint = f"\nAvoid using overly generic relationships like: {prunes}."
+
+    system = f"""You are an expert concept map generation engine.
 Your primary goal is to create a richly interconnected and meaningful concept map in JSON format.
 This map should visually represent relationships between key ideas derived from the user's prompt.
 
+{cluster_hint}{flow_hint}{anchor_hint}{prune_hint}
+
 JSON Structure:
-{
+{{
     "concepts": [
-        {"id": "c1", "label": "Central Concept/Theme", "importance": 1},
-        {"id": "c2", "label": "Key Idea A", "importance": 2},
-        {"id": "c3", "label": "Key Idea B", "importance": 2},
-        {"id": "c4", "label": "Supporting Detail A.1", "importance": 3},
-        {"id": "c5", "label": "Related Aspect C", "importance": 2}
+        {{ "id": "c1", "label": "Central Concept/Theme", "importance": 1 }},
+        ...
     ],
     "relationships": [
-        {"from": "c1", "to": "c2", "label": "explains"},
-        {"from": "c1", "to": "c3", "label": "is characterized by"},
-        {"from": "c2", "to": "c4", "label": "includes example"},
-        {"from": "c3", "to": "c5", "label": "influences"},
-        {"from": "c2", "to": "c5", "label": "is connected to"} // Example of a cross-link
+        {{ "from": "c1", "to": "c2", "label": "explains" }},
+        ...
     ],
-    "layout": {
-        "type": "force-directed", // Suggests a dynamic, physics-based layout
-        "spacing": {
-            "idealNodeSpacing": 150, // Ideal distance between nodes
-            "edgeLength": 180        // Preferred length for edges
-        },
-        "initial": { // Optional: hints for initial placement if needed
+    "layout": {{
+        "type": "force-directed",
+        "spacing": {{
+            "idealNodeSpacing": 150,
+            "edgeLength": 180
+        }},
+        "initial": {{
             "radius": 350,
-            "center": {"x": 500, "y": 400}
-        }
-    }
-}
+            "center": {{ "x": 500, "y": 400 }}
+        }}
+    }}
+}}
 
 Instructions:
-1.  Identify Core Concepts: Extract the main concepts, ideas, and entities from the user's prompt.
-    -   One concept should generally serve as a central theme if appropriate for the topic.
-    -   "id": Must be a unique string for each concept.
-    -   "label": A clear, concise name for the concept.
-    -   "importance": (Optional, 1-3 scale, 1=most important) Can help with visual emphasis if the frontend uses it.
-2.  Establish Rich Relationships:
-    -   This is CRITICAL. Do not just create simple pairs. Aim for a NETWORK structure.
-    -   Connect concepts with meaningful, descriptive linking phrases ("label" for the relationship).
-    -   Create MULTIPLE connections from and to concepts. Include CROSS-LINKS between different branches of thought.
-    -   "from": ID of the source concept.
-    -   "to": ID of the target concept.
-    -   "label": A verb phrase or prepositional phrase describing how the 'from' concept relates to the 'to' concept (e.g., "leads to", "is part of", "contrasts with").
-3.  Network Structure: The map should illustrate a web of knowledge, not just a list or a tree.
-4.  Layout: A "force-directed" layout is often good for concept maps. Provide reasonable spacing suggestions.
-5.  Depth and Breadth: Generate a reasonable number of concepts (e.g., 5-15) and relationships to adequately cover the topic without being overwhelming.
-6.  Clarity and Cohesion: Ensure the map is understandable and the relationships are logical.
-7.  The entire output MUST be a single, valid JSON object.
+1. Identify and extract main concepts and cluster them where applicable.
+2. Create rich relationships (not just one-directional trees).
+3. Use linking phrases that are specific and non-redundant.
+4. Ensure the result is logical, networked, and well-structured.
+5. Output a valid JSON object only.
 """
     return _ask_llm(prompt, system)
 
