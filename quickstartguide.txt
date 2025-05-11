@@ -1,0 +1,52 @@
+QUICKSTART GUIDE: Whiteboard AI
+=============================
+
+Backend (Python/FastAPI)
+------------------------
+1. Open a terminal and navigate to the backend directory:
+   cd backend
+
+2. (Recommended) Create and activate a virtual environment:
+   python -m venv venv
+   source venv/bin/activate   # On Windows: venv\Scripts\activate
+
+3. Install dependencies:
+   pip install -r requirements.txt
+
+4. Copy the .env.example to .env and add your OpenAI API key:
+   cp .env.example .env
+   # Edit .env and set OPENAI_API_KEY=your-key-here
+
+5. Start the backend server:
+   python main.py
+
+   # Or, if you want to use relative imports:
+   # cd ..
+   # python -m backend.main
+
+   The backend will run at http://localhost:8000
+
+Frontend (React/Vite)
+---------------------
+1. Open a new terminal and navigate to the frontend directory:
+   cd frontend
+
+2. Install dependencies:
+   npm install
+
+3. Start the frontend development server:
+   npm run dev
+
+   The frontend will run at http://localhost:3000
+
+Usage
+-----
+- Open http://localhost:3000 in your browser.
+- Enter a prompt (e.g., "Create a mind map about project management").
+- Click "Generate Diagram" to visualize.
+
+Troubleshooting
+---------------
+- If you see import errors, make sure you are running the backend as described above.
+- If you change the backend code, restart the backend server.
+- If you change the frontend code, the dev server will hot-reload by default.
