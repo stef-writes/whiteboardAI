@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+*.pdb
+*.egg-info/
+.venv/
+venv/
+ENV/
+.env
+.env.*
+
+# Node.js
+node_modules/
+build/
+dist/
+.npm/
+
+# React
+frontend/build/
+frontend/node_modules/
+
+# OS/Editor
+.DS_Store
+*.swp
+*.swo
+.idea/
+.vscode/
+*.log
+
+# Misc
+*.sqlite3
+*.db
+*.bak
+*.tmp
+*.orig
+
+# Test/coverage
+.coverage
+htmlcov/
+coverage.xml
+
+# Jupyter
+.ipynb_checkpoints/ 
