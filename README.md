@@ -1,58 +1,37 @@
 # Whiteboard AI
 
-A real-time diagram generator using OpenAI's API. This application takes a user prompt and converts it into various types of diagrams (mind maps, flowcharts, concept maps) with interactive visualizations.
+A web application that generates interactive diagrams from text prompts using OpenAI's API.
 
 ## Features
 
-- 🤖 AI-powered diagram generation
-- 🧠 Multiple diagram types:
-  - Mind Maps (with radial layout)
-  - Flowcharts
-  - Concept Maps
-- 🎨 Interactive visualizations with ReactFlow
-- 🔄 Real-time updates
-- 📱 Responsive design
-- 🎯 Automatic prompt classification
-- 🎨 Modern Material UI components
-- 🔍 Smart layout algorithms
-
-## Prerequisites
-
-- Python 3.8+
-- Node.js 16+
-- OpenAI API key
+- Generate mind maps, flowcharts, and concept maps from text prompts
+- Interactive diagram visualization with ReactFlow
+- Real-time diagram generation using OpenAI's API
+- Support for multiple diagram types with automatic classification
 
 ## Setup
 
 ### Backend Setup
 
-1. Navigate to the backend directory:
+1. Create and activate a virtual environment:
 ```bash
 cd backend
-```
-
-2. Create a virtual environment and activate it:
-```bash
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+source venv/bin/activate  # On Windows, use: venv\Scripts\activate
 ```
 
-3. Install dependencies:
+2. Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-4. Create a `.env` file:
+3. Set up your OpenAI API key:
 ```bash
 cp .env.example .env
+# Edit .env and add your OpenAI API key
 ```
 
-5. Add your OpenAI API key to the `.env` file:
-```
-OPENAI_API_KEY=your_api_key_here
-```
-
-6. Start the backend server:
+4. Start the backend server:
 ```bash
 python main.py
 ```
@@ -61,103 +40,57 @@ The backend will run on http://localhost:8000
 
 ### Frontend Setup
 
-1. Navigate to the frontend directory:
+1. Install dependencies:
 ```bash
 cd frontend
-```
-
-2. Install dependencies:
-```bash
 npm install
 ```
 
-3. Start the development server:
+2. Start the development server:
 ```bash
 npm run dev
 ```
 
-The frontend will run on http://localhost:3000
+The frontend will run on http://localhost:5173
 
 ## Usage
 
-1. Open your browser and navigate to http://localhost:3000
-2. Enter a prompt describing what you want to visualize, for example:
-   - "Create a mind map about project management"
-   - "Show me a flowchart of the user registration process"
-   - "Make a concept map about artificial intelligence"
-3. Click "Generate Diagram" to create the visualization
-4. Interact with the diagram:
-   - Drag nodes to reposition
-   - Zoom in/out with mouse wheel
-   - Pan by dragging the background
-   - Use the controls in the bottom-right corner
+1. Open http://localhost:5173 in your browser
+2. Enter a prompt describing the diagram you want to generate
+3. The system will automatically classify the type of diagram needed
+4. View and interact with the generated diagram
 
-## Diagram Types
+## Project Structure
 
-### Mind Map
-- Hierarchical structure with radial layout
-- Root node at center with orbiting branches
-- Subitems positioned relative to parent branches
-- Animated connections
-- Color-coded nodes for better visual hierarchy
-
-### Flowchart
-- Sequential flow
-- Left-to-right layout
-- Animated connections
-- Clear start and end points
-- Smart edge routing
-
-### Concept Map
-- Network of related concepts
-- Labeled relationships
-- Circular layout
-- Bidirectional connections
-- Dynamic node positioning
+```
+.
+├── backend/
+│   ├── main.py              # FastAPI application
+│   ├── tools.py             # Core diagram generation logic
+│   ├── structure_analyzer.py # Prompt analysis and preprocessing
+│   └── requirements.txt     # Python dependencies
+├── frontend/
+│   ├── src/
+│   │   ├── App.jsx         # Main application component
+│   │   ├── DiagramViewer.jsx # Diagram type router
+│   │   ├── MindMap.jsx     # Mind map visualization
+│   │   ├── Flowchart.jsx   # Flowchart visualization
+│   │   ├── ConceptMap.jsx  # Concept map visualization
+│   │   └── api.js          # API client
+│   └── package.json        # Node.js dependencies
+└── README.md
+```
 
 ## Development
 
-### Project Structure
-```
-whiteboard-ai/
-├── backend/
-│   ├── main.py          # FastAPI application
-│   ├── tools.py         # Diagram generation logic
-│   └── requirements.txt # Python dependencies
-└── frontend/
-    ├── src/
-    │   ├── App.jsx      # Main application component
-    │   ├── api.js       # API integration
-    │   ├── MindMap.jsx  # Mind map visualization
-    │   ├── Flowchart.jsx# Flowchart visualization
-    │   └── ConceptMap.jsx# Concept map visualization
-    └── package.json     # Node.js dependencies
-```
+- Backend API documentation is available at http://localhost:8000/docs
+- The frontend uses React with Vite for fast development
+- ReactFlow is used for diagram visualization
+- OpenAI's API is used for diagram generation
 
-### Technologies Used
+## Notes
 
-- Backend:
-  - FastAPI
-  - OpenAI API
-  - Python
-  - Pydantic for data validation
-
-- Frontend:
-  - React
-  - ReactFlow for diagram rendering
-  - Dagre for layout algorithms
-  - Material UI for components
-  - Vite for build tooling
-  - ESLint for code quality
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
-
-## License
-
-MIT 
+- Always activate the virtual environment before running the backend
+- Keep your OpenAI API key secure and never commit it to version control
+- The backend uses FastAPI's automatic API documentation
+- The frontend uses ReactFlow for interactive diagram visualization 
