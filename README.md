@@ -36,7 +36,7 @@ cp .env.example .env
 python main.py
 ```
 
-The backend will run on http://localhost:8000
+The backend will run on http://localhost:3000
 
 ### Frontend Setup
 
@@ -83,7 +83,7 @@ The frontend will run on http://localhost:5173
 
 ## Development
 
-- Backend API documentation is available at http://localhost:8000/docs
+- Backend API documentation is available at http://localhost:3000/docs
 - The frontend uses React with Vite for fast development
 - ReactFlow is used for diagram visualization
 - OpenAI's API is used for diagram generation
