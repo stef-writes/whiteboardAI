@@ -1,0 +1,191 @@
+Part 1: Overview
+1. Install Needed Packages
+bash
+Copy
+Edit
+npm install react-flow-renderer axios
+🧠 2. Prompt Parsing Function (simplified)
+Mocked version for now — can be replaced with OpenAI call:
+
+
+// utils/parsePromptToNodes.ts
+export function parsePromptToFlowchart(prompt: string) {
+  // Mocked structure
+  return {
+    nodes: [
+      { id: '1', data: { label: 'Start' }, position: { x: 250, y: 0 }, type: 'input' },
+      { id: '2', data: { label: 'Input Thought' }, position: { x: 250, y: 80 } },
+      { id: '3', data: { label: 'Is the thought complex?' }, position: { x: 250, y: 160 } },
+      { id: '4', data: { label: 'Break down into parts' }, position: { x: 100, y: 240 } },
+      { id: '5', data: { label: 'Apply LLM to thought' }, position: { x: 400, y: 240 } },
+      { id: '6', data: { label: 'Combine outputs' }, position: { x: 250, y: 320 } },
+      { id: '7', data: { label: 'Output Graph of Thought' }, position: { x: 250, y: 400 } },
+      { id: '8', data: { label: 'End' }, position: { x: 250, y: 480 }, type: 'output' },
+    ],
+    edges: [
+      { id: 'e1-2', source: '1', target: '2' },
+      { id: 'e2-3', source: '2', target: '3' },
+      { id: 'e3-4', source: '3', target: '4', label: 'Yes' },
+      { id: 'e3-5', source: '3', target: '5', label: 'No' },
+      { id: 'e4-6', source: '4', target: '6' },
+      { id: 'e5-6', source: '5', target: '6' },
+      { id: 'e6-7', source: '6', target: '7' },
+      { id: 'e7-8', source: '7', target: '8' },
+    ],
+  };
+}
+⚛️ 3. React Component
+tsx
+Copy
+Edit
+// App.tsx
+import React, { useState } from 'react';
+import ReactFlow, { Background, Controls } from 'react-flow-renderer';
+import { parsePromptToFlowchart } from './utils/parsePromptToNodes';
+
+export default function App() {
+  const [elements, setElements] = useState({ nodes: [], edges: [] });
+  const [prompt, setPrompt] = useState('');
+
+  const generate = () => {
+    const flow = parsePromptToFlowchart(prompt);
+    setElements(flow);
+  };
+
+  return (
+    <div style={{ width: '100vw', height: '100vh' }}>
+      <div style={{ padding: 20 }}>
+        <input
+          style={{ width: 400 }}
+          placeholder="Enter your idea..."
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+        />
+        <button onClick={generate}>Generate Diagram</button>
+      </div>
+      <ReactFlow nodes={elements.nodes} edges={elements.edges} fitView>
+        <Background />
+        <Controls />
+      </ReactFlow>
+    </div>
+  );
+}
+
+==================================================================
+Part 2:
+🧠 Prompt Template (System + User)
+System Prompt
+vbnet
+Copy
+Edit
+You are a diagram assistant. Your job is to turn user questions or ideas into a structured flowchart. 
+
+Return a JSON object with two keys:
+- "nodes": list of labeled steps or decisions
+- "edges": list of connections between node IDs, optionally with labels (like "Yes"/"No")
+
+Each node should have:
+  - id (string)
+  - label (string)
+  - type (optional: "default", "input", "output", or "decision")
+
+Each edge should have:
+  - id (string)
+  - source (string, node id)
+  - target (string, node id)
+  - label (optional)
+
+Do not explain anything. Just return valid JSON.
+User Prompt Example
+pgsql
+Copy
+Edit
+How does graph of thought work with LLMs?
+✅ Expected Output Example
+json
+Copy
+Edit
+{
+  "nodes": [
+    { "id": "1", "label": "Start", "type": "input" },
+    { "id": "2", "label": "Input Thought" },
+    { "id": "3", "label": "Is the thought complex?", "type": "decision" },
+    { "id": "4", "label": "Break into parts" },
+    { "id": "5", "label": "Apply LLM to whole thought" },
+    { "id": "6", "label": "Apply LLM to parts" },
+    { "id": "7", "label": "Combine outputs" },
+    { "id": "8", "label": "Output Graph of Thought" },
+    { "id": "9", "label": "End", "type": "output" }
+  ],
+  "edges": [
+    { "id": "e1-2", "source": "1", "target": "2" },
+    { "id": "e2-3", "source": "2", "target": "3" },
+    { "id": "e3-4", "source": "3", "target": "4", "label": "Yes" },
+    { "id": "e3-5", "source": "3", "target": "5", "label": "No" },
+    { "id": "e4-6", "source": "4", "target": "6" },
+    { "id": "e5-7", "source": "5", "target": "7" },
+    { "id": "e6-7", "source": "6", "target": "7" },
+    { "id": "e7-8", "source": "7", "target": "8" },
+    { "id": "e8-9", "source": "8", "target": "9" }
+  ]
+}
+
+==================================================================
+Part 3:
+✅ 1. Install Dagre
+bash
+Copy
+Edit
+npm install dagre
+⚙️ 2. Layout Function
+ts
+Copy
+Edit
+// utils/layoutGraph.ts
+import dagre from 'dagre';
+import { Node, Edge } from 'react-flow-renderer';
+
+const nodeWidth = 180;
+const nodeHeight = 60;
+
+export function layoutNodesWithDagre(
+  nodes: Node[],
+  edges: Edge[],
+  direction: 'TB' | 'LR' = 'TB' // Top-Bottom or Left-Right
+): { nodes: Node[]; edges: Edge[] } {
+  const dagreGraph = new dagre.graphlib.Graph();
+  dagreGraph.setDefaultEdgeLabel(() => ({}));
+  dagreGraph.setGraph({ rankdir: direction });
+
+  nodes.forEach((node) => {
+    dagreGraph.setNode(node.id, { width: nodeWidth, height: nodeHeight });
+  });
+
+  edges.forEach((edge) => {
+    dagreGraph.setEdge(edge.source, edge.target);
+  });
+
+  dagre.layout(dagreGraph);
+
+  const positionedNodes = nodes.map((node) => {
+    const { x, y } = dagreGraph.node(node.id);
+    return {
+      ...node,
+      position: { x, y },
+      sourcePosition: direction === 'LR' ? 'right' : 'bottom',
+      targetPosition: direction === 'LR' ? 'left' : 'top',
+    };
+  });
+
+  return { nodes: positionedNodes, edges };
+}
+🧪 3. How to Use
+tsx
+Copy
+Edit
+import { layoutNodesWithDagre } from './utils/layoutGraph';
+
+// Inside your diagram generation logic:
+const raw = parsePromptToFlowchart(prompt); // or OpenAI output
+const { nodes, edges } = layoutNodesWithDagre(raw.nodes, raw.edges);
+setElements({ nodes, edges });

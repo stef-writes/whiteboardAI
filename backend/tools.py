@@ -91,52 +91,58 @@ Instructions:
     return _ask_llm(prompt, system)
 
 def generate_flowchart(prompt: str, hints: dict = None) -> dict:
-    # ... use hints in the future if needed ...
-    system = """You are an expert flowchart generation engine.
-Your goal is to create a clear, logical, and complete flowchart in JSON format.
+    system = """You are a diagram assistant. Your job is to turn user questions or ideas into a structured flowchart.
 
-JSON Structure:
+Return a JSON object with two keys:
+- "nodes": list of labeled steps or decisions
+- "edges": list of connections between node IDs, optionally with labels (like "Yes"/"No")
+
+Each node should have:
+  - id (string)
+  - label (string)  // Renamed from 'text' for consistency with other diagram types
+  - type (optional: "default", "input", "output", or "decision")
+
+Each edge should have:
+  - id (string)
+  - source (string, node id) // Renamed from 'from' for reactflow compatibility
+  - target (string, node id) // Renamed from 'to' for reactflow compatibility
+  - label (optional)
+
+Example Output:
 {
-    "nodes": [
-        {"id": "1", "text": "Start Node", "type": "start"},
-        {"id": "2", "text": "Step or Action 1", "type": "process"},
-        {"id": "3", "text": "Decision Point?", "type": "decision"},
-        {"id": "4", "text": "Step or Action 2A (if yes)", "type": "process"},
-        {"id": "5", "text": "Step or Action 2B (if no)", "type": "process"},
-        {"id": "6", "text": "End Node", "type": "end"}
-    ],
-    "edges": [
-        {"from": "1", "to": "2", "label": ""},
-        {"from": "2", "to": "3", "label": ""},
-        {"from": "3", "to": "4", "label": "Yes"},
-        {"from": "3", "to": "5", "label": "No"},
-        {"from": "4", "to": "6", "label": ""},
-        {"from": "5", "to": "6", "label": ""}
-    ],
-    "layout": {
-        "type": "dagre", // For directed graph layout
-        "direction": "TB", // TB = Top to Bottom, LR = Left to Right
+  "nodes": [
+    { "id": "1", "label": "Start", "type": "input" },
+    { "id": "2", "label": "Input Thought" },
+    { "id": "3", "label": "Is the thought complex?", "type": "decision" },
+    { "id": "4", "label": "Break into parts" },
+    { "id": "5", "label": "Apply LLM to whole thought" },
+    { "id": "6", "label": "Apply LLM to parts" },
+    { "id": "7", "label": "Combine outputs" },
+    { "id": "8", "label": "Output Graph of Thought" },
+    { "id": "9", "label": "End", "type": "output" }
+  ],
+  "edges": [
+    { "id": "e1-2", "source": "1", "target": "2" },
+    { "id": "e2-3", "source": "2", "target": "3" },
+    { "id": "e3-4", "source": "3", "target": "4", "label": "Yes" },
+    { "id": "e3-5", "source": "3", "target": "5", "label": "No" },
+    { "id": "e4-6", "source": "4", "target": "6" },
+    { "id": "e5-7", "source": "5", "target": "7" },
+    { "id": "e6-7", "source": "6", "target": "7" },
+    { "id": "e7-8", "source": "7", "target": "8" },
+    { "id": "e8-9", "source": "8", "target": "9" }
+  ],
+  "layout": { // Keep layout suggestions as before
+        "type": "dagre",
+        "direction": "TB",
         "spacing": {
-            "nodeSeparation": 100, // Spacing between nodes in the same rank
-            "rankSeparation": 120  // Spacing between ranks (layers)
+            "nodeSeparation": 100,
+            "rankSeparation": 120
         }
     }
 }
 
-Instructions:
-1.  Nodes: Define all necessary steps, decisions, and start/end points.
-    -   "id": Must be a unique string for each node.
-    -   "text": Clear and concise description of the step/decision.
-    -   "type": Use appropriate types like "start", "end", "process", "decision". Other types can be "input", "output" if relevant.
-2.  Edges: Connect the nodes to represent the flow.
-    -   "from": ID of the source node.
-    -   "to": ID of the target node.
-    -   "label": Use for decision outcomes (e.g., "Yes", "No", "True", "False") or brief transition descriptions.
-3.  Flow: The flowchart must have a clear start and at least one end point. All nodes should be part of a sequence.
-4.  Logic: Ensure decision points have distinct paths for different outcomes.
-5.  Layout: Suggest "TB" (Top to Bottom) or "LR" (Left to Right) for direction. Adjust spacing for readability.
-6.  Completeness: The flowchart should represent a complete process as implied by the user's prompt.
-7.  The entire output MUST be a single, valid JSON object.
+Do not explain anything. Just return valid JSON based on the user's prompt about the diagram they want.
 """
     return _ask_llm(prompt, system)
 
@@ -198,6 +204,10 @@ Instructions:
 
 def _ask_llm(prompt: str, system_prompt: str) -> dict:
     try:
+        # Check if API key is set
+        if not os.getenv("OPENAI_API_KEY"):
+            raise ValueError("OpenAI API key is not set. Please check your .env file.")
+
         response = client.chat.completions.create(
             model="gpt-4",
             messages=[
@@ -207,6 +217,13 @@ def _ask_llm(prompt: str, system_prompt: str) -> dict:
             temperature=0.4,
             max_tokens=1000
         )
-        return json.loads(response.choices[0].message.content)
+        
+        try:
+            return json.loads(response.choices[0].message.content)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Failed to parse LLM response as JSON: {str(e)}")
+            
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"LLM error: {str(e)}") 

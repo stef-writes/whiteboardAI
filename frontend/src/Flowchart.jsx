@@ -1,80 +1,81 @@
 import ReactFlow, { Background, Controls, Panel, applyNodeChanges } from "reactflow";
 import "reactflow/dist/style.css";
-import dagre from "dagre";
 import { useMemo, useState, useEffect } from "react";
+import { layoutNodesWithDagre } from "./utils/layoutUtils"; // Corrected import path
 
-const nodeWidth = 180;
-const nodeHeight = 50;
+// Default node style, can be overridden by individual node styles from backend data
+const defaultNodeStyle = {
+  width: 180,
+  height: 60,
+  fontSize: '14px',
+  fontWeight: 500,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+  cursor: 'move',
+  padding: 10,
+  borderRadius: 5,
+};
 
-function layoutNodesAndEdges(data) {
-  const dagreGraph = new dagre.graphlib.Graph();
-  dagreGraph.setDefaultEdgeLabel(() => ({}));
-  dagreGraph.setGraph({ rankdir: "LR" }); // LR = Left to Right. Use "TB" for top-down.
-
-  data.nodes.forEach((node) => {
-    dagreGraph.setNode(node.id, { width: nodeWidth, height: nodeHeight });
-  });
-
-  data.edges.forEach((edge) => {
-    dagreGraph.setEdge(edge.from, edge.to);
-  });
-
-  dagre.layout(dagreGraph);
-
-  const nodes = data.nodes.map((node) => {
-    const { x, y } = dagreGraph.node(node.id);
-    return {
-      id: node.id,
-      position: { x, y },
-      data: { label: node.text },
-      type: "default",
-      draggable: true,
-      style: { 
-        width: nodeWidth,
-        height: nodeHeight,
-        background: node.id === '1' ? '#ff6b6b' : '#4ecdc4',
-        color: 'white',
-        padding: 10,
-        borderRadius: 5,
-        fontSize: '14px',
-        fontWeight: 500,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-        cursor: 'move'
-      }
-    };
-  });
-
-  const edges = data.edges.map((edge, i) => ({
-    id: `e-${edge.from}-${edge.to}-${i}`,
-    source: edge.from,
-    target: edge.to,
-    type: "smoothstep",
-    animated: true,
-    style: { 
-      stroke: '#95e1d3',
-      strokeWidth: 2
-    },
-    markerEnd: {
-      type: 'arrowclosed',
-      color: '#95e1d3',
+export default function Flowchart({ data }) { // data here is expected to be { nodes: [], edges: [], layout: {direction: 'TB' | 'LR'} }
+  const { nodes: initialNodes, edges: initialEdges } = useMemo(() => {
+    // Ensure data.nodes and data.edges exist before trying to layout
+    if (!data || !data.nodes || !data.edges) {
+      return { nodes: [], edges: [] };
     }
-  }));
 
-  return { nodes, edges };
-}
+    // Prepare nodes for dagre: ensure they have an id and label for dagre and React Flow
+    // The backend should already provide 'label' (previously 'text')
+    const reactFlowNodes = data.nodes.map(node => ({
+      id: node.id,
+      data: { label: node.label }, // Use 'label' from backend
+      type: node.type || "default",
+      draggable: true,
+      style: {
+        ...defaultNodeStyle,
+        background: node.type === 'input' || node.type === 'start' ? '#ff6b6b' : 
+                    node.type === 'output' || node.type === 'end' ? '#7edc67' : '#4ecdc4',
+        color: 'white',
+        ...(node.style || {}), // Allow backend to provide specific styles
+      },
+    }));
 
-export default function Flowchart({ data }) {
-  const { nodes: initialNodes, edges } = useMemo(() => layoutNodesAndEdges(data), [data]);
+    // Edges are mostly fine, just ensure IDs are unique for React Flow if not already
+    const reactFlowEdges = data.edges.map((edge, i) => ({
+      id: edge.id || `e-${edge.source}-${edge.target}-${i}`,
+      source: edge.source,
+      target: edge.target,
+      label: edge.label,
+      type: "smoothstep",
+      animated: true,
+      style: { stroke: '#95e1d3', strokeWidth: 2 },
+      markerEnd: { type: 'arrowclosed', color: '#95e1d3' },
+    }));
+
+    const layoutDirection = data.layout?.direction || 'TB'; // Default to Top-Bottom
+    return layoutNodesWithDagre(reactFlowNodes, reactFlowEdges, layoutDirection);
+
+  }, [data]);
+
   const [nodes, setNodes] = useState(initialNodes);
-  useEffect(() => { setNodes(initialNodes); }, [initialNodes]);
-  const [nodesDraggable, setNodesDraggable] = useState(true);
+  const [edges, setEdges] = useState(initialEdges); // Edges are generally static after layout
+
+  useEffect(() => {
+    setNodes(initialNodes);
+    setEdges(initialEdges); 
+  }, [initialNodes, initialEdges]);
 
   const onNodesChange = (changes) => {
     setNodes((nds) => applyNodeChanges(changes, nds));
   };
+  
+  // We might need onEdgesChange if edges are also dynamic, but for now, they are static after layout
+  // const onEdgesChange = (changes) => {
+  //   setEdges((eds) => applyEdgeChanges(changes, eds));
+  // };
+
+  const [nodesDraggable, setNodesDraggable] = useState(true);
 
   return (
     <div style={{ height: "100vh", width: "100%" }}>
@@ -82,6 +83,7 @@ export default function Flowchart({ data }) {
         nodes={nodes} 
         edges={edges} 
         onNodesChange={onNodesChange}
+        // onEdgesChange={onEdgesChange} // Uncomment if edges become dynamic
         fitView
         fitViewOptions={{ padding: 0.2 }}
         nodesDraggable={nodesDraggable}

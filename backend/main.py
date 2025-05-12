@@ -2,6 +2,11 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from tools import generate_diagram
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
@@ -17,17 +22,38 @@ app.add_middleware(
 class PromptRequest(BaseModel):
     prompt: str
 
+@app.get("/")
+async def root():
+    return {"message": "Whiteboard AI backend is running"}
+
 @app.post("/api/generate-diagram")
 async def get_diagram(prompt_req: PromptRequest):
     try:
+        logger.info(f"Received request with prompt: {prompt_req.prompt}")
+        
         if not prompt_req.prompt:
+            logger.error("Empty prompt received")
             raise HTTPException(status_code=400, detail="Prompt cannot be empty")
+            
+        logger.info("Generating diagram...")
         result = generate_diagram(prompt_req.prompt)
+        logger.info(f"Diagram generated successfully: {result}")
         return result
     except Exception as e:
-        print(f"Error generating diagram: {str(e)}")  # Add logging
+        logger.error(f"Error generating diagram: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=3000)
+    HOST = "127.0.0.1"  # localhost
+    PORT = 3000
+    
+    logger.info(f"Starting server on http://{HOST}:{PORT}")
+    logger.info("Press CTRL+C to quit")
+    
+    uvicorn.run(
+        app,
+        host=HOST,
+        port=PORT,
+        log_level="info"
+    )
