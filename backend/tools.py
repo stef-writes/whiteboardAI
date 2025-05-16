@@ -11,6 +11,29 @@ load_dotenv()
 # Initialize OpenAI client
 client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
+def generate_diagram(prompt: str) -> dict:
+    # Step 1: Preprocess the prompt to get structure hints
+    structure_hints = analyze_concepts_and_structure(prompt)
+
+    # Step 2: Classify diagram type
+    diagram_type = classify_prompt(prompt)
+
+    generators = {
+        "mindmap": generate_mindmap,
+        "flowchart": generate_flowchart,
+        "concept_map": generate_concept_map
+    }
+
+    if diagram_type not in generators:
+        raise HTTPException(status_code=400, detail=f"Unknown diagram type: {diagram_type}")
+
+    # Step 3: Pass structure hints into the generator
+    return {
+        "type": diagram_type,
+        "structure": structure_hints,
+        "data": generators[diagram_type](prompt, structure_hints)
+    }
+
 def classify_prompt(prompt: str) -> str:
     classifier_prompt = """
 You are a diagram classification engine.
@@ -32,31 +55,7 @@ Respond with ONLY the type, no other text.
     )
     return response.choices[0].message.content.strip().lower()
 
-def generate_diagram(prompt: str) -> dict:
-    # Step 1: Preprocess the prompt to get structure hints
-    structure_hints = analyze_concepts_and_structure(prompt)
-
-    # Step 2: Classify diagram type
-    diagram_type = classify_prompt(prompt)
-
-    generators = {
-        "mindmap": generate_mindmap,
-        "flowchart": generate_flowchart,
-        "concept_map": generate_concept_map
-    }
-
-    if diagram_type not in generators:
-        raise HTTPException(status_code=400, detail=f"Unknown diagram type: {diagram_type}")
-
-    # Step 3: Pass structure hints into the generator (optional; see below)
-    return {
-        "type": diagram_type,
-        "structure": structure_hints,
-        "data": generators[diagram_type](prompt, structure_hints)  # <- update generators to accept hints
-    }
-
 def generate_mindmap(prompt: str, hints: dict = None) -> dict:
-    # ... use hints in the future if needed ...
     system = """You are an expert mind map generation engine.
 Your goal is to create a well-structured and informative mind map in JSON format.
 
@@ -70,11 +69,11 @@ JSON Structure:
     },
     "layout": {
         "type": "radial",
-        "radius": 250, // Base radius for main branches
-        "center": {"x": 500, "y": 400}, // Canvas center
+        "radius": 250,
+        "center": {"x": 500, "y": 400},
         "spacing": {
-            "branch": 100, // Additional radial distance for sub-topics from their branch node
-            "subitem": 70   // Spacing between sub-items if they were to be arranged linearly (less critical for pure radial)
+            "branch": 100,
+            "subitem": 70
         }
     }
 }
@@ -91,58 +90,58 @@ Instructions:
     return _ask_llm(prompt, system)
 
 def generate_flowchart(prompt: str, hints: dict = None) -> dict:
-    system = """You are a diagram assistant. Your job is to turn user questions or ideas into a structured flowchart.
+    system = """### 🧠 **Whiteboard AI System Prompt**
 
-Return a JSON object with two keys:
-- "nodes": list of labeled steps or decisions
-- "edges": list of connections between node IDs, optionally with labels (like "Yes"/"No")
+You are an intelligent diagram planning assistant for an AI workspace called BrainChain.
 
-Each node should have:
-  - id (string)
-  - label (string)  // Renamed from 'text' for consistency with other diagram types
-  - type (optional: "default", "input", "output", or "decision")
+In this system, users build **visual logic graphs** to accomplish creative or analytical tasks using modular AI blocks called **nodes**.
 
-Each edge should have:
-  - id (string)
-  - source (string, node id) // Renamed from 'from' for reactflow compatibility
-  - target (string, node id) // Renamed from 'to' for reactflow compatibility
-  - label (optional)
+Each node represents a unit of AI-powered logic and can be one of the following types:
 
-Example Output:
+* **Prompt Node** – runs a prompt using an LLM
+* **Tool Node** – runs a script, API, or utility
+* **Agent Node** – performs a multi-step autonomous task
+* **Decision Node** – branches logic based on conditions
+* **Render Node** – formats output (e.g., JSON → HTML)
+* **Eval Node** – scores or evaluates results
+* **Retrieval Node** – fetches external or internal data
+
+The user provides a **task or goal**. Your job is to:
+
+1. **Infer the high-level steps** the user would take using AI logic.
+2. **Propose a node graph** that breaks the task into modular, labeled nodes.
+3. Show logical **connections** between nodes (e.g., input/output flows, conditionals).
+4. Consider advanced patterns like **Tree of Thought, Graph of Thought, or other networks of LLM chaining** if the task implies complex reasoning, parallel processing, or iterative refinement.
+5. Return a complete diagram **as structured JSON**, using the format below.
+
+### Example Output Schema:
+
+```json
 {
+  "type": "flowchart",
   "nodes": [
-    { "id": "1", "label": "Start", "type": "input" },
-    { "id": "2", "label": "Input Thought" },
-    { "id": "3", "label": "Is the thought complex?", "type": "decision" },
-    { "id": "4", "label": "Break into parts" },
-    { "id": "5", "label": "Apply LLM to whole thought" },
-    { "id": "6", "label": "Apply LLM to parts" },
-    { "id": "7", "label": "Combine outputs" },
-    { "id": "8", "label": "Output Graph of Thought" },
-    { "id": "9", "label": "End", "type": "output" }
+    { "id": "1", "label": "Ingest User Profile", "type": "Retrieval" },
+    { "id": "2", "label": "Analyze Preferences", "type": "Prompt" },
+    { "id": "3", "label": "Generate Recommendations", "type": "Prompt" },
+    { "id": "4", "label": "Format as JSON", "type": "Render" }
   ],
   "edges": [
-    { "id": "e1-2", "source": "1", "target": "2" },
-    { "id": "e2-3", "source": "2", "target": "3" },
-    { "id": "e3-4", "source": "3", "target": "4", "label": "Yes" },
-    { "id": "e3-5", "source": "3", "target": "5", "label": "No" },
-    { "id": "e4-6", "source": "4", "target": "6" },
-    { "id": "e5-7", "source": "5", "target": "7" },
-    { "id": "e6-7", "source": "6", "target": "7" },
-    { "id": "e7-8", "source": "7", "target": "8" },
-    { "id": "e8-9", "source": "8", "target": "9" }
+    { "id": "e1", "source": "1", "target": "2" },
+    { "id": "e2", "source": "2", "target": "3" },
+    { "id": "e3", "source": "3", "target": "4" }
   ],
-  "layout": { // Keep layout suggestions as before
-        "type": "dagre",
-        "direction": "TB",
-        "spacing": {
-            "nodeSeparation": 100,
-            "rankSeparation": 120
-        }
+  "layout": {
+    "type": "dagre",
+    "direction": "TB",
+    "spacing": {
+      "nodeSeparation": 100,
+      "rankSeparation": 120
     }
+  }
 }
+```
 
-Do not explain anything. Just return valid JSON based on the user's prompt about the diagram they want.
+Do **not** include explanations. Just return a valid JSON diagram of nodes and edges, optimized for clarity and execution logic.
 """
     return _ask_llm(prompt, system)
 
@@ -209,7 +208,8 @@ def _ask_llm(prompt: str, system_prompt: str) -> dict:
             raise ValueError("OpenAI API key is not set. Please check your .env file.")
 
         response = client.chat.completions.create(
-            model="gpt-4",
+            model="gpt-4-turbo-preview",
+            response_format={ "type": "json_object" },
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": f"Create a diagram about: {prompt}"}
@@ -218,10 +218,15 @@ def _ask_llm(prompt: str, system_prompt: str) -> dict:
             max_tokens=1000
         )
         
+        llm_response_content = response.choices[0].message.content
+        if not llm_response_content:
+            raise ValueError("LLM returned empty content even in JSON mode.")
+
         try:
-            return json.loads(response.choices[0].message.content)
+            return json.loads(llm_response_content)
         except json.JSONDecodeError as e:
-            raise ValueError(f"Failed to parse LLM response as JSON: {str(e)}")
+            error_message = f"Failed to parse LLM response as JSON: {str(e)}. Response: {llm_response_content[:200]}"
+            raise ValueError(error_message)
             
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
