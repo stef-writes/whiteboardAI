@@ -1,4 +1,4 @@
-const API_BASE_URL = "http://127.0.0.1:3000";  // Use explicit IP instead of localhost
+const API_BASE_URL = "http://127.0.0.1:3001";  // Updated port to match backend
 
 export async function fetchDiagram(prompt) {
   try {

@@ -46,7 +46,7 @@ async def get_diagram(prompt_req: PromptRequest):
 if __name__ == "__main__":
     import uvicorn
     HOST = "127.0.0.1"  # localhost
-    PORT = 3000
+    PORT = 3001  # Changed from 3000 to avoid port conflict
     
     logger.info(f"Starting server on http://{HOST}:{PORT}")
     logger.info("Press CTRL+C to quit")
