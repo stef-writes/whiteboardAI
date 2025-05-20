@@ -21,19 +21,22 @@ function layoutMindMap(data) {
     data: { label: data.root },
     draggable: true,
     style: { 
-      width: 140,
-      height: 40,
+      width: Math.max(180, data.root.length * 8), // Dynamic width based on text length
+      height: 60,
       background: '#ff6b6b',
       color: 'white',
-      padding: 10,
-      borderRadius: 5,
-      fontSize: '14px',
-      fontWeight: 500,
+      padding: '10px 15px',
+      borderRadius: 30, // Circular for root node
+      fontSize: '16px',
+      fontWeight: 600,
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-      cursor: 'move'
+      boxShadow: '0 4px 6px rgba(0,0,0,0.15)',
+      cursor: 'move',
+      textAlign: 'center',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis'
     }
   });
 
@@ -45,26 +48,33 @@ function layoutMindMap(data) {
     const branchX = center.x + radius * Math.cos(angle);
     const branchY = center.y + radius * Math.sin(angle);
     const branchId = `branch-${i}`;
+    
+    // Dynamic width based on text length
+    const branchWidth = Math.max(160, branch.length * 9);
 
     nodes.push({
       id: branchId,
-      position: { x: branchX, y: branchY },
+      position: { x: branchX - branchWidth/2, y: branchY - 25 }, // Adjust position for centered node
       data: { label: branch },
       draggable: true,
       style: { 
-        width: 140,
-        height: 40,
+        width: branchWidth,
+        height: 50,
         background: '#4ecdc4',
         color: 'white',
-        padding: 10,
-        borderRadius: 5,
-        fontSize: '14px',
+        padding: '10px 15px',
+        borderRadius: 10, // Rounded rectangle
+        fontSize: '15px',
         fontWeight: 500,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-        cursor: 'move'
+        boxShadow: '0 4px 6px rgba(0,0,0,0.15)',
+        cursor: 'move',
+        textAlign: 'center',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        border: '2px solid #3db4ac'
       }
     });
 
@@ -72,36 +82,56 @@ function layoutMindMap(data) {
       id: `e-root-${branchId}`,
       source: "root",
       target: branchId,
-      type: 'smoothstep',
-      animated: true,
-      style: { stroke: '#95e1d3', strokeWidth: 2 }
+      type: 'default', // Changed to default for smoother bezier curve
+      style: { 
+        stroke: '#95e1d3', 
+        strokeWidth: 2,
+        borderRadius: 20
+      },
+      animated: false,
+      markerEnd: {
+        type: 'arrow',
+        width: 15,
+        height: 15,
+        color: '#95e1d3',
+      }
     });
 
     items.forEach((item, j) => {
       const subId = `${branchId}-item-${j}`;
+      
+      // Adjust angle slightly to avoid crowding
+      const subAngle = angle + (j - Math.floor(items.length/2)) * (angleStep * 0.15);
       const offset = spacing.subitem;
-      const subX = branchX + offset * Math.cos(angle);
-      const subY = branchY + offset * Math.sin(angle);
+      const subX = branchX + offset * Math.cos(subAngle);
+      const subY = branchY + offset * Math.sin(subAngle);
+      
+      // Dynamic width for sub-items too
+      const itemWidth = Math.max(140, item.length * 7);
 
       nodes.push({
         id: subId,
-        position: { x: subX, y: subY },
+        position: { x: subX - itemWidth/2, y: subY - 20 }, // Adjust for centering
         data: { label: item },
         draggable: true,
         style: { 
-          width: 140,
+          width: itemWidth,
           height: 40,
-          background: '#95e1d3',
-          color: 'white',
-          padding: 10,
-          borderRadius: 5,
+          background: '#ffffff',
+          color: '#555555',
+          padding: '8px 12px',
+          borderRadius: 20, // Pill shape
           fontSize: '14px',
-          fontWeight: 500,
+          fontWeight: 400,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-          cursor: 'move'
+          cursor: 'move',
+          textAlign: 'center',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          border: '1px solid #95e1d3'
         }
       });
 
@@ -109,9 +139,12 @@ function layoutMindMap(data) {
         id: `e-${branchId}-${subId}`,
         source: branchId,
         target: subId,
-        type: 'smoothstep',
-        animated: true,
-        style: { stroke: '#95e1d3', strokeWidth: 2 }
+        type: 'default', // Changed to default for smoother bezier curve
+        animated: false,
+        style: { 
+          stroke: '#95e1d3', 
+          strokeWidth: 1.5 
+        }
       });
     });
   });
@@ -136,7 +169,7 @@ export default function MindMap({ data }) {
         edges={edges} 
         onNodesChange={onNodesChange}
         fitView
-        fitViewOptions={{ padding: 0.2 }}
+        fitViewOptions={{ padding: 0.3 }} // Increased padding
         nodesDraggable={nodesDraggable}
         nodesConnectable={false}
         elementsSelectable={true}
@@ -146,7 +179,7 @@ export default function MindMap({ data }) {
         maxZoom={2}
         defaultViewport={{ x: 0, y: 0, zoom: 1 }}
       >
-        <Background />
+        <Background color="#f0f0f0" gap={20} />
         <Controls />
         <Panel position="top-right" style={{ background: 'white', padding: '10px', borderRadius: '5px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
           <button
