@@ -36,13 +36,30 @@ def generate_diagram(prompt: str) -> dict:
 
 def classify_prompt(prompt: str) -> str:
     classifier_prompt = """
-You are a diagram classification engine.
-Given a user's prompt, respond ONLY with one of the following diagram types:
-- "mindmap"
-- "concept_map"
-- "flowchart"
+You are a diagram classification expert for storytelling. Follow these criteria:
 
-Respond with ONLY the type, no other text.
+1. **Mindmap** - Choose when:
+   - Central idea exploration (themes, worldbuilding, character traits)
+   - Key phrases: "brainstorm", "explore aspects of", "key elements of"
+   - Example: "Develop the morality theme in my cyberpunk story"
+
+2. **Concept Map** - Choose when:
+   - Complex interconnections (relationships, motivations, backstories)
+   - Key phrases: "relationships between", "how X affects Y", "connections"
+   - Example: "Map how the protagonist's trauma influences side characters"
+
+3. **Flowchart** - Choose when:
+   - Sequential processes (plot progression, scene sequences)
+   - Key phrases: "step-by-step", "process of", "sequence of events"
+   - Example: "Show the detective's investigation process"
+
+Decision Process:
+1. Identify primary focus: concept (mindmap), relationships (concept), or sequence (flowchart)
+2. Check for temporal markers (first, then, finally) → flowchart
+3. Look for relational verbs (impacts, causes, needs) → concept_map
+4. Default to mindmap for undefined cases
+
+Respond ONLY with: mindmap, concept_map, or flowchart
 """
     response = client.chat.completions.create(
         model="gpt-4",
@@ -56,150 +73,134 @@ Respond with ONLY the type, no other text.
     return response.choices[0].message.content.strip().lower()
 
 def generate_mindmap(prompt: str, hints: dict = None) -> dict:
-    system = """You are an expert mind map generation engine.
-Your goal is to create a well-structured and informative mind map in JSON format.
+    system = """
+You are a story mindmap architect. Create JSON with:
 
-JSON Structure:
+**Structure:**
+- root: Core story concept (max 3 words)
+- branches: 3-5 key categories (Characters, Themes, etc.)
+- subtopics: Specific elements per category
+- layout: radial
+
+**Rules:**
+1. Include at least 3 sub-items per branch
+2. Prioritize elements from analysis: {hints}
+3. Use concise, evocative labels
+4. Ensure all items relate to root
+
+**Example:**
 {
-    "root": "Central Topic/Idea derived from the user's prompt",
-    "branches": {
-        "Main Branch 1": ["Sub-topic 1.1", "Sub-topic 1.2", "Sub-topic 1.3"],
-        "Main Branch 2": ["Sub-topic 2.1", "Sub-topic 2.2"],
-        "Main Branch 3": ["Sub-topic 3.1", "Sub-topic 3.2", "Sub-topic 3.3", "Sub-topic 3.4"]
-    },
-    "layout": {
-        "type": "radial",
-        "radius": 250,
-        "center": {"x": 500, "y": 400},
-        "spacing": {
-            "branch": 100,
-            "subitem": 70
-        }
-    }
+  "root": "War Trauma",
+  "branches": {
+    "Characters": ["Veteran Protagonist", "Supportive Spouse", "Antagonist Officer"],
+    "Themes": ["Guilt", "Recovery", "Identity Loss"],
+    "Key Symbols": ["Medal", "Nightmares", "Empty Chair"]
+  },
+  "layout": {"type": "radial"}
 }
 
-Instructions:
-1.  The "root" should clearly state the main subject of the mind map.
-2.  "branches" should be an object where each key is a major theme or category related to the root.
-3.  Each main branch should have an array of 2-5 descriptive "sub-topics" or key points.
-4.  Ensure the content is logically organized, with clear hierarchical relationships.
-5.  The layout parameters provided are suggestions; adjust them if the content complexity warrants it for clarity, but maintain the radial type.
-6.  Focus on creating a balanced and easy-to-understand mind map.
-7.  The entire output MUST be a single, valid JSON object.
-"""
-    return _ask_llm(prompt, system)
+Generate valid JSON only. No explanations.
+""".format(hints=json.dumps(hints if hints else {}, indent=2))
+
+    user_content = f"Create mindmap for: {prompt}\nAnalyzed Elements:\n{json.dumps(hints if hints else {}, indent=2)}"
+    return _ask_llm_with_content(user_content, system)
 
 def generate_flowchart(prompt: str, hints: dict = None) -> dict:
-    system = """### 🧠 **Whiteboard AI System Prompt**
+    system = """
+You are a narrative flowchart expert. Create JSON with:
 
-You are an intelligent diagram planning assistant for an AI workspace called BrainChain.
+**Structure:**
+- nodes: Story beats (id, label)
+- edges: Transitions (source→target)
+- layout: TB (top-bottom)
 
-In this system, users build **visual logic graphs** to accomplish creative or analytical tasks using modular AI blocks called **nodes**.
+**Rules:**
+1. Minimum 5 nodes, 4 edges
+2. Include key phases: Setup/Conflict/Resolution
+3. Use causal language ("leads to", "results in")
+4. Highlight elements from: {hints}
 
-Each node represents a unit of AI-powered logic and can be one of the following types:
-
-* **Prompt Node** – runs a prompt using an LLM
-* **Tool Node** – runs a script, API, or utility
-* **Agent Node** – performs a multi-step autonomous task
-* **Decision Node** – branches logic based on conditions
-* **Render Node** – formats output (e.g., JSON → HTML)
-* **Eval Node** – scores or evaluates results
-* **Retrieval Node** – fetches external or internal data
-
-The user provides a **task or goal**. Your job is to:
-
-1. **Infer the high-level steps** the user would take using AI logic.
-2. **Propose a node graph** that breaks the task into modular, labeled nodes.
-3. Show logical **connections** between nodes (e.g., input/output flows, conditionals).
-4. Consider advanced patterns like **Tree of Thought, Graph of Thought, or other networks of LLM chaining** if the task implies complex reasoning, parallel processing, or iterative refinement.
-5. Return a complete diagram **as structured JSON**, using the format below.
-
-### Example Output Schema:
-
-```json
+**Example:**
 {
-  "type": "flowchart",
   "nodes": [
-    { "id": "1", "label": "Ingest User Profile", "type": "Retrieval" },
-    { "id": "2", "label": "Analyze Preferences", "type": "Prompt" },
-    { "id": "3", "label": "Generate Recommendations", "type": "Prompt" },
-    { "id": "4", "label": "Format as JSON", "type": "Render" }
+    {"id": "1", "label": "Inciting Incident: Meteor spotted"},
+    {"id": "2", "label": "Team assembles to investigate"}
   ],
-  "edges": [
-    { "id": "e1", "source": "1", "target": "2" },
-    { "id": "e2", "source": "2", "target": "3" },
-    { "id": "e3", "source": "3", "target": "4" }
-  ],
-  "layout": {
-    "type": "dagre",
-    "direction": "TB",
-    "spacing": {
-      "nodeSeparation": 100,
-      "rankSeparation": 120
-    }
-  }
+  "edges": [{"source": "1", "target": "2"}],
+  "layout": {"direction": "TB"}
 }
-```
 
-Do **not** include explanations. Just return a valid JSON diagram of nodes and edges, optimized for clarity and execution logic.
-"""
-    return _ask_llm(prompt, system)
+Generate valid JSON only. No markdown.
+""".format(hints=json.dumps(hints if hints else {}, indent=2))
+
+    user_content = f"Create flowchart for: {prompt}\nKey Events:\n{json.dumps(hints if hints else {}, indent=2)}"
+    return _ask_llm_with_content(user_content, system)
 
 def generate_concept_map(prompt: str, hints: dict = None) -> dict:
-    import json
-    cluster_hint = ""
-    flow_hint = ""
-    anchor_hint = ""
-    prune_hint = ""
+    system = """
+You are a narrative relationship mapper. Create JSON with:
 
-    if hints:
-        if "clusters" in hints:
-            cluster_hint = "\nOrganize concepts into these groups:\n" + json.dumps(hints["clusters"], indent=2)
-        if "flow_direction" in hints:
-            flow_hint = f"\nPrefer a {hints['flow_direction']} layout for visual clarity."
-        if "anchor_node" in hints:
-            anchor_hint = f'\nTry to use "{hints["anchor_node"]}" as the central concept if appropriate.'
-        if "relationship_pruning" in hints and "collapse" in hints["relationship_pruning"]:
-            prunes = ", ".join(hints["relationship_pruning"]["collapse"])
-            prune_hint = f"\nAvoid using overly generic relationships like: {prunes}."
+**Structure:**
+- concepts: Entities with id/label
+- relationships: Labeled connections
+- layout: force-directed
 
-    system = f"""You are an expert concept map generation engine.
-Your primary goal is to create a richly interconnected and meaningful concept map in JSON format.
-This map should visually represent relationships between key ideas derived from the user's prompt.
+**Rules:**
+1. Minimum 5 concepts, 6 relationships
+2. Use action verbs for labels ("motivates", "hinders")
+3. Show indirect connections (A→B→C)
+4. Incorporate: {hints}
 
-{cluster_hint}{flow_hint}{anchor_hint}{prune_hint}
+**Example:**
+{
+  "concepts": [
+    {"id": "c1", "label": "AI Companion"},
+    {"id": "c2", "label": "Abandonment Trauma"}
+  ],
+  "relationships": [
+    {"from": "c2", "to": "c1", "label": "drives attachment to"}
+  ],
+  "layout": {"type": "force-directed"}
+}
 
-JSON Structure:
-{{
-    "concepts": [
-        {{ "id": "c1", "label": "Central Concept/Theme", "importance": 1 }},
-        ...
-    ],
-    "relationships": [
-        {{ "from": "c1", "to": "c2", "label": "explains" }},
-        ...
-    ],
-    "layout": {{
-        "type": "force-directed",
-        "spacing": {{
-            "idealNodeSpacing": 150,
-            "edgeLength": 180
-        }},
-        "initial": {{
-            "radius": 350,
-            "center": {{ "x": 500, "y": 400 }}
-        }}
-    }}
-}}
+Generate valid JSON only. No extra text.
+""".format(hints=json.dumps(hints if hints else {}, indent=2))
 
-Instructions:
-1. Identify and extract main concepts and cluster them where applicable.
-2. Create rich relationships (not just one-directional trees).
-3. Use linking phrases that are specific and non-redundant.
-4. Ensure the result is logical, networked, and well-structured.
-5. Output a valid JSON object only.
-"""
-    return _ask_llm(prompt, system)
+    user_content = f"Create concept map for: {prompt}\nRelationships:\n{json.dumps(hints if hints else {}, indent=2)}"
+    return _ask_llm_with_content(user_content, system)
+
+def _ask_llm_with_content(user_content: str, system_prompt: str) -> dict:
+    """Custom LLM function to handle modified user content format"""
+    try:
+        # Check if API key is set
+        if not os.getenv("OPENAI_API_KEY"):
+            raise ValueError("OpenAI API key is not set. Please check your .env file.")
+
+        response = client.chat.completions.create(
+            model="gpt-4-turbo-preview",
+            response_format={"type": "json_object"},
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_content}
+            ],
+            temperature=0.4,
+            max_tokens=1000
+        )
+        
+        llm_response_content = response.choices[0].message.content
+        if not llm_response_content:
+            raise ValueError("LLM returned empty content even in JSON mode.")
+
+        try:
+            return json.loads(llm_response_content)
+        except json.JSONDecodeError as e:
+            error_message = f"Failed to parse LLM response as JSON: {str(e)}. Response: {llm_response_content[:200]}"
+            raise ValueError(error_message)
+            
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"LLM error: {str(e)}")
 
 def _ask_llm(prompt: str, system_prompt: str) -> dict:
     try:
