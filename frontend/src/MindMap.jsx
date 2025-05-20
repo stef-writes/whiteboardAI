@@ -5,23 +5,44 @@ import { useMemo, useState, useEffect } from "react";
 function layoutMindMap(data) {
   const nodes = [];
   const edges = [];
-  const layout = data.layout || {
+  
+  // Add better fallback defaults for layout and its properties
+  const defaultLayout = {
     type: "radial",
     radius: 200,
     center: { x: 400, y: 300 },
     spacing: { branch: 80, subitem: 60 }
   };
+  
+  // Make sure layout exists and has all the needed properties
+  const layout = {
+    ...defaultLayout,
+    ...(data.layout || {}),
+    // Ensure center object exists and has valid coordinates
+    center: {
+      x: (data.layout?.center?.x !== undefined) ? data.layout.center.x : defaultLayout.center.x,
+      y: (data.layout?.center?.y !== undefined) ? data.layout.center.y : defaultLayout.center.y
+    },
+    // Ensure spacing object exists
+    spacing: {
+      ...defaultLayout.spacing,
+      ...(data.layout?.spacing || {})
+    }
+  };
 
   const { center, radius, spacing } = layout;
+
+  // Check if data.root exists, fallback to "Topic" if not
+  const rootLabel = data.root || "Topic";
 
   // Add root node at center
   nodes.push({
     id: "root",
     position: { x: center.x, y: center.y },
-    data: { label: data.root },
+    data: { label: rootLabel },
     draggable: true,
     style: { 
-      width: Math.max(180, data.root.length * 8), // Dynamic width based on text length
+      width: Math.max(180, rootLabel.length * 8), // Dynamic width based on text length
       height: 60,
       background: '#ff6b6b',
       color: 'white',
@@ -40,7 +61,12 @@ function layoutMindMap(data) {
     }
   });
 
-  const branches = Object.entries(data.branches);
+  // If no branches, add a default empty one
+  const branches = Object.entries(data.branches || {});
+  if (branches.length === 0) {
+    return { nodes, edges };
+  }
+  
   const angleStep = (2 * Math.PI) / branches.length;
 
   branches.forEach(([branch, items], i) => {

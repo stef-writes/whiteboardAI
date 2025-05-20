@@ -77,62 +77,86 @@ function getNodeStyle(concept, index, total) {
   };
 }
 
-export default function ConceptMap({ data }) {
+export default function ConceptMap({ data, onError }) {
   const { nodes: initialNodes, edges: initialEdges } = useMemo(() => {
-    if (!data || !data.concepts || !data.relationships) {
+    try {
+      if (!data) {
+        console.warn("No data provided to ConceptMap component");
+        return { nodes: [], edges: [] };
+      }
+      
+      if (!data.concepts || !Array.isArray(data.concepts) || data.concepts.length === 0) {
+        console.warn("ConceptMap data is missing concepts array or it's empty");
+        return { nodes: [], edges: [] };
+      }
+      
+      if (!data.relationships || !Array.isArray(data.relationships)) {
+        console.warn("ConceptMap data is missing relationships array");
+        data.relationships = []; // Provide empty relationships array to avoid errors
+      }
+      
+      // Create nodes with better styling
+      const totalConcepts = data.concepts.length;
+      const newNodes = data.concepts.map((concept, index) => ({
+        id: concept.id || `concept-${index}`, // Ensure ID exists
+        data: { label: typeof concept.label === 'string' ? concept.label : `Concept ${index}` }, // Ensure label exists
+        draggable: true,
+        style: getNodeStyle(concept, index, totalConcepts)
+      }));
+
+      // Create better looking edges with proper styling
+      const newEdges = data.relationships.map((rel, index) => {
+        // Ensure source and target exist
+        if (!rel.from || !rel.to) {
+          console.warn(`Relationship ${index} is missing source or target`);
+          return null; // This will be filtered out below
+        }
+        
+        return {
+          id: `edge-${index}`,
+          source: rel.from,
+          target: rel.to,
+          label: rel.label || '',
+          type: 'default', // Smoother curves
+          animated: false,
+          style: { 
+            stroke: '#95e1d3',
+            strokeWidth: rel.strength ? Math.max(1, rel.strength * 3) : 2, // Variable width based on strength
+          },
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            color: '#95e1d3',
+            width: 15,
+            height: 15
+          },
+          labelStyle: {
+            fill: '#666',
+            fontSize: '12px',
+            fontWeight: 500
+          },
+          labelBgStyle: {
+            fill: 'white',
+            fillOpacity: 0.9,
+            rx: 4,
+            ry: 4,
+            padding: 10
+          },
+          labelBgPadding: [8, 4],
+        };
+      }).filter(Boolean); // Filter out any null values
+
+      // Get a better layout using dagre
+      const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(
+        newNodes, 
+        newEdges,
+        data.layout?.direction || 'LR'
+      );
+      
+      return { nodes: layoutedNodes, edges: layoutedEdges };
+    } catch (error) {
+      console.error("Error in ConceptMap component:", error);
       return { nodes: [], edges: [] };
     }
-    
-    // Create nodes with better styling
-    const totalConcepts = data.concepts.length;
-    const newNodes = data.concepts.map((concept, index) => ({
-      id: concept.id,
-      data: { label: concept.label },
-      draggable: true,
-      style: getNodeStyle(concept, index, totalConcepts)
-    }));
-
-    // Create better looking edges with proper styling
-    const newEdges = data.relationships.map((rel, index) => ({
-      id: `edge-${index}`,
-      source: rel.from,
-      target: rel.to,
-      label: rel.label,
-      type: 'default', // Smoother curves
-      animated: false,
-      style: { 
-        stroke: '#95e1d3',
-        strokeWidth: rel.strength ? Math.max(1, rel.strength * 3) : 2, // Variable width based on strength
-      },
-      markerEnd: {
-        type: MarkerType.ArrowClosed,
-        color: '#95e1d3',
-        width: 15,
-        height: 15
-      },
-      labelStyle: {
-        fill: '#666',
-        fontSize: '12px',
-        fontWeight: 500
-      },
-      labelBgStyle: {
-        fill: 'white',
-        fillOpacity: 0.9,
-        rx: 4,
-        ry: 4,
-        padding: 10
-      },
-      labelBgPadding: [8, 4],
-    }));
-
-    // Get a better layout using dagre
-    const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(
-      newNodes, 
-      newEdges,
-      data.layout?.direction || 'LR'
-    );
-    
-    return { nodes: layoutedNodes, edges: layoutedEdges };
   }, [data]);
   
   const [nodes, setNodes] = useState(initialNodes);

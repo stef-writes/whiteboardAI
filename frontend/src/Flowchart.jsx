@@ -67,76 +67,94 @@ const getNodeStyle = (nodeType) => {
 
 export default function Flowchart({ data }) {
   const { nodes: initialNodes, edges: initialEdges } = useMemo(() => {
-    if (!data || !data.nodes || !data.edges) {
+    // Comprehensive error handling
+    try {
+      if (!data) {
+        console.warn("No data provided to Flowchart component");
+        return { nodes: [], edges: [] };
+      }
+      
+      if (!data.nodes || !Array.isArray(data.nodes) || data.nodes.length === 0) {
+        console.warn("Flowchart data is missing nodes array or it's empty");
+        return { nodes: [], edges: [] };
+      }
+      
+      if (!data.edges || !Array.isArray(data.edges)) {
+        console.warn("Flowchart data is missing edges array");
+        data.edges = []; // Provide empty edges array to avoid errors
+      }
+
+      // Process nodes with better styling
+      const reactFlowNodes = data.nodes.map(node => {
+        // Get dynamic width based on label length
+        const labelText = typeof node.label === 'string' ? node.label : 'Unknown';
+        const labelLength = labelText.length || 10;
+        const minWidth = 150;  
+        const calculatedWidth = Math.max(minWidth, labelLength * 9);
+        
+        // Get style based on node type
+        const nodeStyle = getNodeStyle(node.type);
+        
+        // For decision nodes, we need to handle the label specially
+        const isDecision = node.type === 'decision';
+        
+        return {
+          id: node.id || `node-${Math.random().toString(36).substring(2, 9)}`, // Ensure node has ID
+          data: { 
+            label: isDecision ? 
+              // If it's a decision node, wrap the label in a div that counteracts the rotation
+              <div style={{ transform: 'rotate(-45deg)', width: '100%', maxWidth: '100%' }}>
+                {labelText}
+              </div> : 
+              labelText 
+          },
+          type: node.type || "default",
+          draggable: true,
+          style: {
+            width: calculatedWidth,
+            ...nodeStyle,
+            ...(node.style || {}), // Allow backend to provide specific styles
+          },
+        };
+      });
+
+      // Improve edge styling
+      const reactFlowEdges = data.edges.map((edge, i) => ({
+        id: edge.id || `e-${edge.source}-${edge.target}-${i}`,
+        source: edge.source,
+        target: edge.target,
+        label: edge.label,
+        type: "smoothstep", // Better for flowcharts
+        animated: false, // Animation can be distracting in complex flows
+        style: { 
+          stroke: '#95e1d3', 
+          strokeWidth: 2
+        },
+        markerEnd: { 
+          type: 'arrowclosed', 
+          color: '#95e1d3',
+          width: 15,
+          height: 15
+        },
+        labelStyle: { 
+          fill: '#555', 
+          fontSize: 12,
+          fontWeight: 500
+        },
+        labelBgStyle: { 
+          fill: 'white', 
+          fillOpacity: 0.8,
+          rx: 4, // Rounded rectangle for label background 
+          ry: 4
+        },
+      }));
+
+      const layoutDirection = data.layout?.direction || 'TB';
+      return layoutNodesWithDagre(reactFlowNodes, reactFlowEdges, layoutDirection);
+    } catch (error) {
+      console.error("Error in useMemo callback:", error);
       return { nodes: [], edges: [] };
     }
-
-    // Process nodes with better styling
-    const reactFlowNodes = data.nodes.map(node => {
-      // Get dynamic width based on label length
-      const labelLength = node.label?.length || 10;
-      const minWidth = 150;  
-      const calculatedWidth = Math.max(minWidth, labelLength * 9);
-      
-      // Get style based on node type
-      const nodeStyle = getNodeStyle(node.type);
-      
-      // For decision nodes, we need to handle the label specially
-      const isDecision = node.type === 'decision';
-      
-      return {
-        id: node.id,
-        data: { 
-          label: isDecision ? 
-            // If it's a decision node, wrap the label in a div that counteracts the rotation
-            <div style={{ transform: 'rotate(-45deg)', width: '100%', maxWidth: '100%' }}>
-              {node.label}
-            </div> : 
-            node.label 
-        },
-        type: node.type || "default",
-        draggable: true,
-        style: {
-          width: calculatedWidth,
-          ...nodeStyle,
-          ...(node.style || {}), // Allow backend to provide specific styles
-        },
-      };
-    });
-
-    // Improve edge styling
-    const reactFlowEdges = data.edges.map((edge, i) => ({
-      id: edge.id || `e-${edge.source}-${edge.target}-${i}`,
-      source: edge.source,
-      target: edge.target,
-      label: edge.label,
-      type: "smoothstep", // Better for flowcharts
-      animated: false, // Animation can be distracting in complex flows
-      style: { 
-        stroke: '#95e1d3', 
-        strokeWidth: 2
-      },
-      markerEnd: { 
-        type: 'arrowclosed', 
-        color: '#95e1d3',
-        width: 15,
-        height: 15
-      },
-      labelStyle: { 
-        fill: '#555', 
-        fontSize: 12,
-        fontWeight: 500
-      },
-      labelBgStyle: { 
-        fill: 'white', 
-        fillOpacity: 0.8,
-        rx: 4, // Rounded rectangle for label background 
-        ry: 4
-      },
-    }));
-
-    const layoutDirection = data.layout?.direction || 'TB';
-    return layoutNodesWithDagre(reactFlowNodes, reactFlowEdges, layoutDirection);
   }, [data]);
 
   const [nodes, setNodes] = useState(initialNodes);
