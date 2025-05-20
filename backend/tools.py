@@ -17,7 +17,7 @@ def generate_diagram(prompt: str, mode: str = "story") -> dict:
     
     Args:
         prompt: The user prompt for diagram generation
-        mode: "story" for narrative focus, "general" for universal diagrams
+        mode: "story" for narrative focus, "general" for universal diagrams, "philosophy" for conceptual lattices
     
     Returns:
         Dictionary with diagram type, structure hints, and visualization data
@@ -33,7 +33,16 @@ def generate_diagram(prompt: str, mode: str = "story") -> dict:
         "flowchart": generate_flowchart,
         "concept_map": generate_concept_map
     }
-
+    
+    # For philosophy mode, we always use a specialized concept map
+    if mode == "philosophy":
+        return {
+            "type": "concept_map",  # We'll use concept map visualization for philosophy mode
+            "structure": structure_hints,
+            "data": generate_philosophy(prompt, structure_hints),
+            "mode": mode
+        }
+    
     if diagram_type not in generators:
         raise HTTPException(status_code=400, detail=f"Unknown diagram type: {diagram_type}")
 
@@ -49,6 +58,11 @@ def classify_prompt(prompt: str, mode: str = "story") -> str:
     # For the specific prompt that's failing, force to mindmap
     if "character relationships" in prompt.lower():
         return "mindmap"
+    
+    # If philosophy mode, we handle it separately
+    if mode == "philosophy":
+        # We'll return concept_map for now, but the actual generation will be done by generate_philosophy
+        return "concept_map"
         
     if mode == "story":
         classifier_prompt = """
@@ -125,6 +139,138 @@ Respond ONLY with: mindmap, flowchart, or concept_map
         return "mindmap"
         
     return result
+
+def generate_philosophy(prompt: str, hints: dict = None) -> dict:
+    """
+    Generate a philosophical conceptual lattice diagram based on the prompt.
+    This uses the philosophy mode (previously called latticework mode) to create
+    conceptual structures with rigorous philosophical analysis.
+    """
+    if hints is None:
+        hints = {}
+        
+    system = """
+You are a Conceptual Lattice Architect. Create JSON structure using:
+
+**Analytical Frameworks:**
+1. First-Principle Decomposition:
+   - Iteratively ask "What fundamentally enables X?" (5-Why depth)
+   - Identify atomic conceptual units
+
+2. Premise Mapping:
+   - Distinguish between:
+     * Axioms (unproven foundations)
+     * Theorems (derived concepts)
+     * Boundary Conditions
+
+3. Epistemic Scaffolding:
+   - Map dependencies: X requires Y
+   - Identify circularities/paradoxes
+   - Categorize justification types (empirical, logical, intuitive)
+
+**Output Schema:**
+{
+  "concepts": [
+    {
+      "id": "C1",
+      "label": "Concept",
+      "type": "axiom/theorem/boundary",
+      "epistemic_status": "defined/assumed/derived",
+      "definition": "Precise linguistic formulation"
+    }
+  ],
+  "relationships": [
+    {
+      "from": "C1",
+      "to": "C2",
+      "label": "requires/contradicts/embeds",
+      "strength": 0.9,
+      "argument_form": "deductive/abductive/analogical"
+    }
+  ],
+  "metadata": {
+    "axiomatic_basis": ["C1", "C3"],
+    "paradoxes_detected": []
+  }
+}
+
+**Generation Rules:**
+1. Linguistic Precision:
+   - Use modal logic operators (□ for necessity, ◇ for possibility)
+   - Distinguish "presupposes" vs "entails"
+   - Maintain consistent terminological registers
+
+2. Conceptual Hygiene:
+   - Flag unstated assumptions
+   - Identify equivocation risks
+   - Separate conceptual vs empirical claims
+
+3. Validation Layer:
+   - Apply informal fallacy checks
+   - Test conceptual counterfactuals
+   - Ensure non-contradiction
+"""
+    return _ask_philosophy_llm(prompt, system)
+
+def _ask_philosophy_llm(prompt: str, system_prompt: str) -> dict:
+    """
+    Special LLM function for philosophy mode with enhanced guidance
+    for conceptual precision and epistemic rigor.
+    """
+    try:
+        # Check if API key is set
+        if not os.getenv("OPENAI_API_KEY"):
+            raise ValueError("OpenAI API key is not set. Please check your .env file.")
+
+        response = client.chat.completions.create(
+            model="gpt-4-turbo-preview",
+            response_format={"type": "json_object"},
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"Create a philosophical concept lattice about: {prompt}"},
+                {"role": "assistant", "content": "Remember to:\n"
+                    "1. Use exact philosophical terminology\n"
+                    "2. Maintain distinction between orders of analysis\n"
+                    "3. Apply Russell's Paradox safeguards\n"
+                    "4. Validate conceptual topology consistency"}
+            ],
+            temperature=0.3,  # Balances creativity/rigor
+            max_tokens=1500
+        )
+        
+        llm_response_content = response.choices[0].message.content
+        if not llm_response_content:
+            raise ValueError("LLM returned empty content even in JSON mode.")
+
+        try:
+            # Process the response to ensure it's compatible with concept_map renderer
+            raw_data = json.loads(llm_response_content)
+            
+            # If raw_data has a lattice structure, use that as the root structure
+            if "lattice" in raw_data:
+                if "nodes" in raw_data["lattice"] and "edges" in raw_data["lattice"]:
+                    # Adapt the lattice structure to match concept_map format
+                    return {
+                        "concepts": raw_data["lattice"]["nodes"],
+                        "relationships": raw_data["lattice"]["edges"],
+                        "metadata": raw_data.get("metadata", {})
+                    }
+            
+            # If the format already matches our concept_map structure, just return it
+            if "concepts" in raw_data and "relationships" in raw_data:
+                return raw_data
+                
+            # If the response doesn't have the expected structure, raise error
+            raise ValueError("Response has invalid philosophy lattice structure")
+            
+        except json.JSONDecodeError as e:
+            error_message = f"Failed to parse LLM response as JSON: {str(e)}. Response: {llm_response_content[:200]}"
+            raise ValueError(error_message)
+            
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"LLM error in philosophy mode: {str(e)}")
 
 def generate_mindmap(prompt: str, hints: dict = None, mode: str = "story") -> dict:
     # Ensure hints is a valid dictionary

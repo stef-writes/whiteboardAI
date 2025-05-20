@@ -85,7 +85,7 @@ export default function App() {
             marginBottom: '10px'
           }}>
             <label style={{ fontSize: '16px', color: '#2d3436' }}>Mode:</label>
-            <div style={{ display: 'flex', gap: '15px' }}>
+            <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
               <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
                 <input
                   type="radio"
@@ -107,6 +107,17 @@ export default function App() {
                   style={{ marginRight: '5px' }}
                 />
                 General Mode
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="mode"
+                  value="philosophy"
+                  checked={mode === 'philosophy'}
+                  onChange={() => setMode('philosophy')}
+                  style={{ marginRight: '5px' }}
+                />
+                Philosophy Mode
               </label>
             </div>
           </div>

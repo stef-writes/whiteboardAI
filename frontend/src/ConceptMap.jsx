@@ -38,10 +38,64 @@ function getLayoutedElements(nodes, edges, direction = 'LR') {
   };
 }
 
-// Get node style based on importance or type
-function getNodeStyle(concept, index, total) {
+// Get node style based on importance or type, with special handling for philosophy mode
+function getNodeStyle(concept, index, total, isPhilosophyMode = false) {
   // Use concept.importance if available, otherwise generate based on index
   const importance = concept.importance || (total - index) / total;
+  
+  // In philosophy mode, we have different styling based on epistemic status and type
+  if (isPhilosophyMode) {
+    const type = concept.type || '';
+    const epistemicStatus = concept.epistemic_status || '';
+    
+    // Calculate text width based on length and potential modal operators
+    const fontSize = 14;
+    const textWidth = Math.max(200, concept.label.length * fontSize * 0.7);
+    
+    // Calculate size based on type
+    const sizeScale = 
+      type.includes('axiom') ? 1.2 :
+      type.includes('theorem') ? 1.0 :
+      0.9;
+    
+    const width = textWidth * sizeScale;
+    const height = 60 * sizeScale;
+    
+    // Colors for different philosophical concept types
+    const bgColor = 
+      type.includes('axiom') ? '#4a4e69' :  // Dark purple for axioms
+      type.includes('theorem') ? '#8a5a44' : // Brown for theorems
+      type.includes('boundary') ? '#457b9d' : // Blue for boundary conditions
+      '#2b2d42';  // Dark slate for others
+    
+    const borderColor = 
+      epistemicStatus.includes('defined') ? '#f8961e' :  // Orange for defined concepts
+      epistemicStatus.includes('assumed') ? '#f94144' :  // Red for assumed concepts
+      epistemicStatus.includes('derived') ? '#90be6d' :  // Green for derived concepts
+      '#f1faee';  // White for others
+    
+    return {
+      width,
+      height,
+      background: bgColor,
+      color: 'white',
+      padding: 10,
+      borderRadius: 8,
+      fontSize: `${fontSize}px`,
+      fontWeight: 500,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      boxShadow: '0 4px 6px rgba(0,0,0,0.25)',
+      cursor: 'move',
+      border: `3px solid ${borderColor}`,
+      textAlign: 'center',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis'
+    };
+  }
+  
+  // Standard styling for regular concept maps
   const sizeScale = 0.7 + (importance * 0.5); // Scale between 0.7 and 1.2
   
   // Calculate text width
@@ -77,7 +131,51 @@ function getNodeStyle(concept, index, total) {
   };
 }
 
+// Get edge style enhanced for philosophy mode
+function getEdgeStyle(relationship, isPhilosophyMode = false) {
+  if (isPhilosophyMode) {
+    const relationLabel = relationship.label || relationship.relation || '';
+    const strength = relationship.strength || 0.7;
+    const argumentForm = relationship.argument_form || '';
+    
+    // Colors for different relation types
+    const edgeColor = 
+      relationLabel.includes('requires') ? '#457b9d' :
+      relationLabel.includes('contradicts') ? '#e63946' :
+      relationLabel.includes('entails') ? '#a8dadc' :
+      relationLabel.includes('presupposes') ? '#f8961e' :
+      '#95e1d3';  // Default color
+    
+    // Line style based on argument form
+    const edgeStyle = {
+      stroke: edgeColor,
+      strokeWidth: Math.max(1, strength * 3),
+    };
+    
+    if (argumentForm.includes('deductive')) {
+      edgeStyle.strokeDasharray = '0'; // Solid line for deductive
+    } else if (argumentForm.includes('abductive')) {
+      edgeStyle.strokeDasharray = '5,5'; // Dashed for abductive
+    } else if (argumentForm.includes('analogical')) {
+      edgeStyle.strokeDasharray = '1,5'; // Dotted for analogical
+    }
+    
+    return edgeStyle;
+  }
+  
+  // Standard edge style for regular concept maps
+  return { 
+    stroke: '#95e1d3',
+    strokeWidth: relationship.strength ? Math.max(1, relationship.strength * 3) : 2,
+  };
+}
+
 export default function ConceptMap({ data, onError }) {
+  // Check if we're in philosophy mode
+  const isPhilosophyMode = data?.metadata?.mode === 'philosophy' || 
+                          data?.mode === 'philosophy' ||
+                          Boolean(data?.metadata?.axiomatic_basis);
+
   const { nodes: initialNodes, edges: initialEdges } = useMemo(() => {
     try {
       if (!data) {
@@ -97,12 +195,32 @@ export default function ConceptMap({ data, onError }) {
       
       // Create nodes with better styling
       const totalConcepts = data.concepts.length;
-      const newNodes = data.concepts.map((concept, index) => ({
-        id: concept.id || `concept-${index}`, // Ensure ID exists
-        data: { label: typeof concept.label === 'string' ? concept.label : `Concept ${index}` }, // Ensure label exists
-        draggable: true,
-        style: getNodeStyle(concept, index, totalConcepts)
-      }));
+      const newNodes = data.concepts.map((concept, index) => {
+        // Get the node label - handle special formatting for philosophy mode
+        let nodeLabel = typeof concept.label === 'string' ? concept.label : `Concept ${index}`;
+        
+        // For philosophy mode, we might want to show additional info in the label
+        if (isPhilosophyMode && concept.definition) {
+          // Truncate definition if too long
+          const shortDef = concept.definition.length > 60 
+            ? concept.definition.substring(0, 60) + '...' 
+            : concept.definition;
+            
+          nodeLabel = (
+            <div>
+              <div style={{ fontWeight: 'bold' }}>{nodeLabel}</div>
+              <div style={{ fontSize: '12px', marginTop: '4px', fontStyle: 'italic' }}>{shortDef}</div>
+            </div>
+          );
+        }
+        
+        return {
+          id: concept.id || `concept-${index}`, // Ensure ID exists
+          data: { label: nodeLabel }, 
+          draggable: true,
+          style: getNodeStyle(concept, index, totalConcepts, isPhilosophyMode)
+        };
+      });
 
       // Create better looking edges with proper styling
       const newEdges = data.relationships.map((rel, index) => {
@@ -119,13 +237,10 @@ export default function ConceptMap({ data, onError }) {
           label: rel.label || '',
           type: 'default', // Smoother curves
           animated: false,
-          style: { 
-            stroke: '#95e1d3',
-            strokeWidth: rel.strength ? Math.max(1, rel.strength * 3) : 2, // Variable width based on strength
-          },
+          style: getEdgeStyle(rel, isPhilosophyMode),
           markerEnd: {
             type: MarkerType.ArrowClosed,
-            color: '#95e1d3',
+            color: isPhilosophyMode && rel.relation === 'contradicts' ? '#e63946' : '#95e1d3',
             width: 15,
             height: 15
           },
@@ -157,7 +272,7 @@ export default function ConceptMap({ data, onError }) {
       console.error("Error in ConceptMap component:", error);
       return { nodes: [], edges: [] };
     }
-  }, [data]);
+  }, [data, isPhilosophyMode]);
   
   const [nodes, setNodes] = useState(initialNodes);
   const [edges, setEdges] = useState(initialEdges);
@@ -189,15 +304,59 @@ export default function ConceptMap({ data, onError }) {
         minZoom={0.1}
         maxZoom={2}
       >
-        <Background color="#f0f0f0" gap={20} />
+        <Background 
+          color={isPhilosophyMode ? "#2b2d42" : "#f0f0f0"} 
+          gap={20} 
+          variant={isPhilosophyMode ? "dots" : "lines"}
+          size={isPhilosophyMode ? 1 : 0.5}
+        />
         <Controls />
-        <Panel position="top-right" style={{ background: 'white', padding: '10px', borderRadius: '5px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
+        <Panel position="top-right" style={{ 
+          background: 'white', 
+          padding: '10px', 
+          borderRadius: '5px', 
+          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+        }}>
           <button
             onClick={() => setNodesDraggable(!nodesDraggable)}
-            style={{ padding: '8px 16px', background: nodesDraggable ? '#4ecdc4' : '#b2bec3', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+            style={{ 
+              padding: '8px 16px', 
+              background: nodesDraggable ? '#4ecdc4' : '#b2bec3', 
+              color: 'white', 
+              border: 'none', 
+              borderRadius: '4px', 
+              cursor: 'pointer' 
+            }}
           >
             {nodesDraggable ? '🔒 Lock Nodes' : '🔓 Unlock Nodes'}
           </button>
+          
+          {isPhilosophyMode && data?.metadata?.axiomatic_basis && (
+            <div style={{ 
+              marginTop: '10px', 
+              fontSize: '12px', 
+              background: '#f8f9fa', 
+              padding: '5px', 
+              borderRadius: '4px' 
+            }}>
+              <div style={{ fontWeight: 'bold' }}>Axiomatic Basis:</div>
+              {data.metadata.axiomatic_basis.join(', ')}
+            </div>
+          )}
+          
+          {isPhilosophyMode && data?.metadata?.paradoxes_detected && 
+           data.metadata.paradoxes_detected.length > 0 && (
+            <div style={{ 
+              marginTop: '10px', 
+              fontSize: '12px', 
+              background: '#ffccd5', 
+              padding: '5px', 
+              borderRadius: '4px' 
+            }}>
+              <div style={{ fontWeight: 'bold' }}>Paradoxes:</div>
+              {data.metadata.paradoxes_detected.join(', ')}
+            </div>
+          )}
         </Panel>
       </ReactFlow>
     </div>
