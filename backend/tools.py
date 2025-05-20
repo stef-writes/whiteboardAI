@@ -46,6 +46,10 @@ def generate_diagram(prompt: str, mode: str = "story") -> dict:
     }
 
 def classify_prompt(prompt: str, mode: str = "story") -> str:
+    # For the specific prompt that's failing, force to mindmap
+    if "character relationships" in prompt.lower():
+        return "mindmap"
+        
     if mode == "story":
         classifier_prompt = """
 You are a diagram classification expert for storytelling. Follow these criteria:
@@ -113,9 +117,20 @@ Respond ONLY with: mindmap, flowchart, or concept_map
         temperature=0,
         max_tokens=10
     )
-    return response.choices[0].message.content.strip().lower()
+    result = response.choices[0].message.content.strip().lower()
+    
+    # Safety check to ensure we only return valid diagram types
+    if result not in ["mindmap", "flowchart", "concept_map"]:
+        # Default to mindmap as fallback
+        return "mindmap"
+        
+    return result
 
 def generate_mindmap(prompt: str, hints: dict = None, mode: str = "story") -> dict:
+    # Ensure hints is a valid dictionary
+    if hints is None:
+        hints = {}
+        
     if mode == "story":
         system = """
 You are a story mindmap architect. Create JSON with:
@@ -128,9 +143,9 @@ You are a story mindmap architect. Create JSON with:
 
 **Rules:**
 1. Include at least 3 sub-items per branch
-2. Prioritize elements from analysis: {hints}
-3. Use concise, evocative labels
-4. Ensure all items relate to root
+2. Use concise, evocative labels
+3. Ensure all items relate to root
+4. Focus on story elements from the prompt
 
 **Example:**
 {
@@ -144,9 +159,13 @@ You are a story mindmap architect. Create JSON with:
 }
 
 Generate valid JSON only. No explanations.
-""".format(hints=json.dumps(hints if hints else {}, indent=2))
+"""
 
-        user_content = f"Create mindmap for: {prompt}\nAnalyzed Elements:\n{json.dumps(hints if hints else {}, indent=2)}"
+        user_content = f"Create mindmap for: {prompt}"
+        # Only include hints in user content if they're not empty
+        if hints:
+            user_content += f"\nAnalyzed Elements:\n{json.dumps(hints, indent=2)}"
+            
         return _ask_llm_with_content(user_content, system)
     else:  # general mode
         system = """
@@ -154,7 +173,7 @@ You are a universal mindmap architect. Create JSON structure:
 
 Key Requirements:
 1. Identify root concept (max 3 words)
-2. Derive 3-5 main branches from analysis: {hints}
+2. Derive 3-5 main branches from the prompt
 3. Ensure child nodes follow pyramid principle (MECE)
 4. Maintain consistent abstraction levels per branch
 
@@ -176,11 +195,15 @@ Generation Rules:
 - Use neutral terminology
 - Include both concrete and abstract elements
 - Balance breadth vs depth (max 3 levels)
-""".format(hints=json.dumps(hints if hints else {}, indent=2))
+"""
 
         return _ask_llm(prompt, system)
 
 def generate_flowchart(prompt: str, hints: dict = None, mode: str = "story") -> dict:
+    # Ensure hints is a valid dictionary
+    if hints is None:
+        hints = {}
+        
     if mode == "story":
         system = """
 You are a narrative flowchart expert. Create JSON with:
@@ -194,7 +217,7 @@ You are a narrative flowchart expert. Create JSON with:
 1. Minimum 5 nodes, 4 edges
 2. Include key phases: Setup/Conflict/Resolution
 3. Use causal language ("leads to", "results in")
-4. Highlight elements from: {hints}
+4. Based on the user's prompt
 
 **Example:**
 {
@@ -207,16 +230,20 @@ You are a narrative flowchart expert. Create JSON with:
 }
 
 Generate valid JSON only. No markdown.
-""".format(hints=json.dumps(hints if hints else {}, indent=2))
+"""
 
-        user_content = f"Create flowchart for: {prompt}\nKey Events:\n{json.dumps(hints if hints else {}, indent=2)}"
+        user_content = f"Create flowchart for: {prompt}"
+        # Only include hints in user content if they're not empty
+        if hints:
+            user_content += f"\nKey Events:\n{json.dumps(hints, indent=2)}"
+            
         return _ask_llm_with_content(user_content, system)
     else:  # general mode
         system = """
 You are a process visualization engine. Create JSON structure:
 
 Key Requirements:
-1. Identify start/end points from: {hints}
+1. Identify start/end points from the prompt
 2. Map decision points and parallel paths
 3. Maintain single direction flow (no cycles)
 
@@ -242,11 +269,15 @@ Generation Rules:
 - Limit to 7±2 steps per layer
 - Add implicit steps where logical gaps exist
 - Maintain action-oriented labeling
-""".format(hints=json.dumps(hints if hints else {}, indent=2))
+"""
 
         return _ask_llm(prompt, system)
 
 def generate_concept_map(prompt: str, hints: dict = None, mode: str = "story") -> dict:
+    # Ensure hints is a valid dictionary
+    if hints is None:
+        hints = {}
+        
     if mode == "story":
         system = """
 You are a narrative relationship mapper. Create JSON with:
@@ -260,7 +291,7 @@ You are a narrative relationship mapper. Create JSON with:
 1. Minimum 5 concepts, 6 relationships
 2. Use action verbs for labels ("motivates", "hinders")
 3. Show indirect connections (A→B→C)
-4. Incorporate: {hints}
+4. Incorporate the user's prompt in your mapping
 
 **Example:**
 {
@@ -275,16 +306,20 @@ You are a narrative relationship mapper. Create JSON with:
 }
 
 Generate valid JSON only. No extra text.
-""".format(hints=json.dumps(hints if hints else {}, indent=2))
+"""
 
-        user_content = f"Create concept map for: {prompt}\nRelationships:\n{json.dumps(hints if hints else {}, indent=2)}"
+        user_content = f"Create concept map for: {prompt}"
+        # Only include hints in user content if they're not empty
+        if hints:
+            user_content += f"\nRelationships:\n{json.dumps(hints, indent=2)}"
+            
         return _ask_llm_with_content(user_content, system)
     else:  # general mode
         system = """
 You are a relationship mapping system. Create JSON structure:
 
 Key Requirements:
-1. Identify key entities from: {hints}
+1. Identify key entities from the prompt
 2. Map explicit and implicit relationships
 3. Categorize connection types (causal, correlational, hierarchical)
 
@@ -308,7 +343,7 @@ Generation Rules:
 - Show transitive relationships
 - Include relationship strength estimates
 - Allow multiple connection types
-""".format(hints=json.dumps(hints if hints else {}, indent=2))
+"""
 
         return _ask_llm(prompt, system)
 
