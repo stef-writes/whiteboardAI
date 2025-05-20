@@ -11,12 +11,22 @@ load_dotenv()
 # Initialize OpenAI client
 client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-def generate_diagram(prompt: str) -> dict:
+def generate_diagram(prompt: str, mode: str = "story") -> dict:
+    """
+    Generate a diagram based on the user's prompt.
+    
+    Args:
+        prompt: The user prompt for diagram generation
+        mode: "story" for narrative focus, "general" for universal diagrams
+    
+    Returns:
+        Dictionary with diagram type, structure hints, and visualization data
+    """
     # Step 1: Preprocess the prompt to get structure hints
     structure_hints = analyze_concepts_and_structure(prompt)
 
-    # Step 2: Classify diagram type
-    diagram_type = classify_prompt(prompt)
+    # Step 2: Classify diagram type based on mode
+    diagram_type = classify_prompt(prompt, mode)
 
     generators = {
         "mindmap": generate_mindmap,
@@ -27,15 +37,17 @@ def generate_diagram(prompt: str) -> dict:
     if diagram_type not in generators:
         raise HTTPException(status_code=400, detail=f"Unknown diagram type: {diagram_type}")
 
-    # Step 3: Pass structure hints into the generator
+    # Step 3: Pass structure hints and mode into the generator
     return {
         "type": diagram_type,
         "structure": structure_hints,
-        "data": generators[diagram_type](prompt, structure_hints)
+        "data": generators[diagram_type](prompt, structure_hints, mode),
+        "mode": mode
     }
 
-def classify_prompt(prompt: str) -> str:
-    classifier_prompt = """
+def classify_prompt(prompt: str, mode: str = "story") -> str:
+    if mode == "story":
+        classifier_prompt = """
 You are a diagram classification expert for storytelling. Follow these criteria:
 
 1. **Mindmap** - Choose when:
@@ -61,6 +73,37 @@ Decision Process:
 
 Respond ONLY with: mindmap, concept_map, or flowchart
 """
+    else:  # general mode
+        classifier_prompt = """
+You are a visualization intent analyzer. Follow this decision framework:
+
+1. Identify the core components:
+   - Hierarchy: Presence of parent/child relationships
+   - Sequence: Time-based or stepwise elements
+   - Relationships: Non-hierarchical connections
+   - Abstraction: Conceptual vs concrete elements
+
+2. Map to diagram type using these indicators:
+   [Mindmap] When user mentions:
+   - "Break down", "aspects of", "elements of"
+   - Central concept with branching categories
+   - Exploratory language ("explore", "brainstorm")
+
+   [Flowchart] When user mentions:
+   - "Process", "steps", "sequence"
+   - Temporal markers ("first", "then", "finally")
+   - Decision points ("if X then Y")
+
+   [Concept Map] When user mentions:
+   - "Relationships between", "how X connects to Y"
+   - Cross-domain connections
+   - Non-linear relationships
+
+3. Confidence scoring (1-5) for each type
+4. Select type with highest score, tie-break: mindmap → flowchart → concept_map
+
+Respond ONLY with: mindmap, flowchart, or concept_map
+"""
     response = client.chat.completions.create(
         model="gpt-4",
         messages=[
@@ -72,8 +115,9 @@ Respond ONLY with: mindmap, concept_map, or flowchart
     )
     return response.choices[0].message.content.strip().lower()
 
-def generate_mindmap(prompt: str, hints: dict = None) -> dict:
-    system = """
+def generate_mindmap(prompt: str, hints: dict = None, mode: str = "story") -> dict:
+    if mode == "story":
+        system = """
 You are a story mindmap architect. Create JSON with:
 
 **Structure:**
@@ -102,11 +146,43 @@ You are a story mindmap architect. Create JSON with:
 Generate valid JSON only. No explanations.
 """.format(hints=json.dumps(hints if hints else {}, indent=2))
 
-    user_content = f"Create mindmap for: {prompt}\nAnalyzed Elements:\n{json.dumps(hints if hints else {}, indent=2)}"
-    return _ask_llm_with_content(user_content, system)
+        user_content = f"Create mindmap for: {prompt}\nAnalyzed Elements:\n{json.dumps(hints if hints else {}, indent=2)}"
+        return _ask_llm_with_content(user_content, system)
+    else:  # general mode
+        system = """
+You are a universal mindmap architect. Create JSON structure:
 
-def generate_flowchart(prompt: str, hints: dict = None) -> dict:
-    system = """
+Key Requirements:
+1. Identify root concept (max 3 words)
+2. Derive 3-5 main branches from analysis: {hints}
+3. Ensure child nodes follow pyramid principle (MECE)
+4. Maintain consistent abstraction levels per branch
+
+Output Format:
+{{
+  "root": "Core Concept",
+  "branches": {{
+    "Category1": ["Sub1", "Sub2"],
+    "Category2": ["SubA", "SubB"]
+  }},
+  "metadata": {{
+    "domain": "Detected domain (e.g., business, education)",
+    "focus": "Primary emphasis (conceptual/ practical)"
+  }}
+}}
+
+Generation Rules:
+- Avoid domain-specific assumptions
+- Use neutral terminology
+- Include both concrete and abstract elements
+- Balance breadth vs depth (max 3 levels)
+""".format(hints=json.dumps(hints if hints else {}, indent=2))
+
+        return _ask_llm(prompt, system)
+
+def generate_flowchart(prompt: str, hints: dict = None, mode: str = "story") -> dict:
+    if mode == "story":
+        system = """
 You are a narrative flowchart expert. Create JSON with:
 
 **Structure:**
@@ -133,11 +209,46 @@ You are a narrative flowchart expert. Create JSON with:
 Generate valid JSON only. No markdown.
 """.format(hints=json.dumps(hints if hints else {}, indent=2))
 
-    user_content = f"Create flowchart for: {prompt}\nKey Events:\n{json.dumps(hints if hints else {}, indent=2)}"
-    return _ask_llm_with_content(user_content, system)
+        user_content = f"Create flowchart for: {prompt}\nKey Events:\n{json.dumps(hints if hints else {}, indent=2)}"
+        return _ask_llm_with_content(user_content, system)
+    else:  # general mode
+        system = """
+You are a process visualization engine. Create JSON structure:
 
-def generate_concept_map(prompt: str, hints: dict = None) -> dict:
-    system = """
+Key Requirements:
+1. Identify start/end points from: {hints}
+2. Map decision points and parallel paths
+3. Maintain single direction flow (no cycles)
+
+Output Format:
+{{
+  "nodes": [
+    {{"id": "start", "type": "terminal", "label": "Start"}},
+    {{"id": "step1", "type": "process", "label": "Action"}},
+    {{"id": "decision1", "type": "decision", "label": "Choice?"}}
+  ],
+  "edges": [
+    {{"source": "start", "target": "step1", "label": ""}},
+    {{"source": "decision1", "target": "stepX", "label": "Yes"}}
+  ],
+  "metadata": {{
+    "flow_type": "Linear/Decision-based/Parallel",
+    "complexity": "Simple/Moderate/Complex"
+  }}
+}}
+
+Generation Rules:
+- Use universal flowchart symbols (process, decision, etc)
+- Limit to 7±2 steps per layer
+- Add implicit steps where logical gaps exist
+- Maintain action-oriented labeling
+""".format(hints=json.dumps(hints if hints else {}, indent=2))
+
+        return _ask_llm(prompt, system)
+
+def generate_concept_map(prompt: str, hints: dict = None, mode: str = "story") -> dict:
+    if mode == "story":
+        system = """
 You are a narrative relationship mapper. Create JSON with:
 
 **Structure:**
@@ -166,8 +277,40 @@ You are a narrative relationship mapper. Create JSON with:
 Generate valid JSON only. No extra text.
 """.format(hints=json.dumps(hints if hints else {}, indent=2))
 
-    user_content = f"Create concept map for: {prompt}\nRelationships:\n{json.dumps(hints if hints else {}, indent=2)}"
-    return _ask_llm_with_content(user_content, system)
+        user_content = f"Create concept map for: {prompt}\nRelationships:\n{json.dumps(hints if hints else {}, indent=2)}"
+        return _ask_llm_with_content(user_content, system)
+    else:  # general mode
+        system = """
+You are a relationship mapping system. Create JSON structure:
+
+Key Requirements:
+1. Identify key entities from: {hints}
+2. Map explicit and implicit relationships
+3. Categorize connection types (causal, correlational, hierarchical)
+
+Output Format:
+{{
+  "concepts": [
+    {{"id": "c1", "label": "ConceptA", "type": "entity/action/state"}},
+    {{"id": "c2", "label": "ConceptB", "type": "entity/action/state"}}
+  ],
+  "relationships": [
+    {{"from": "c1", "to": "c2", "label": "influences", "strength": 0.7}}
+  ],
+  "metadata": {{
+    "connection_density": "Sparse/Moderate/Dense",
+    "relationship_types": ["causal", "temporal", "hierarchical"]
+  }}
+}}
+
+Generation Rules:
+- Distinguish between entities and actions
+- Show transitive relationships
+- Include relationship strength estimates
+- Allow multiple connection types
+""".format(hints=json.dumps(hints if hints else {}, indent=2))
+
+        return _ask_llm(prompt, system)
 
 def _ask_llm_with_content(user_content: str, system_prompt: str) -> dict:
     """Custom LLM function to handle modified user content format"""

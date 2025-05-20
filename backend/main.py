@@ -21,6 +21,7 @@ app.add_middleware(
 
 class PromptRequest(BaseModel):
     prompt: str
+    mode: str = "story"  # Default to story mode, but allow general mode
 
 @app.get("/")
 async def root():
@@ -29,14 +30,21 @@ async def root():
 @app.post("/api/generate-diagram")
 async def get_diagram(prompt_req: PromptRequest):
     try:
-        logger.info(f"Received request with prompt: {prompt_req.prompt}")
+        logger.info(f"Received request with prompt: {prompt_req.prompt}, mode: {prompt_req.mode}")
         
         if not prompt_req.prompt:
             logger.error("Empty prompt received")
             raise HTTPException(status_code=400, detail="Prompt cannot be empty")
+        
+        # Validate mode
+        if prompt_req.mode not in ["story", "general"]:
+            logger.warning(f"Invalid mode received: {prompt_req.mode}, defaulting to 'story'")
+            mode = "story"
+        else:
+            mode = prompt_req.mode
             
-        logger.info("Generating diagram...")
-        result = generate_diagram(prompt_req.prompt)
+        logger.info(f"Generating diagram in {mode} mode...")
+        result = generate_diagram(prompt_req.prompt, mode)
         logger.info(f"Diagram generated successfully: {result}")
         return result
     except Exception as e:

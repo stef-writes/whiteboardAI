@@ -1,15 +1,15 @@
 const API_BASE_URL = "http://127.0.0.1:3001";  // Updated port to match backend
 
-export async function fetchDiagram(prompt) {
+export async function fetchDiagram(prompt, mode = "story") {
   try {
-    console.log('Sending request to backend...');
+    console.log(`Sending request to backend in ${mode} mode...`);
     const res = await fetch(`${API_BASE_URL}/api/generate-diagram`, {
       method: "POST",
       headers: { 
         "Content-Type": "application/json",
         "Accept": "application/json"
       },
-      body: JSON.stringify({ prompt }),
+      body: JSON.stringify({ prompt, mode }),
     });
 
     console.log('Response status:', res.status);

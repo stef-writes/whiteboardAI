@@ -4,6 +4,7 @@ import DiagramViewer from './DiagramViewer';
 
 export default function App() {
   const [prompt, setPrompt] = useState('');
+  const [mode, setMode] = useState('story');
   const [diagram, setDiagram] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -17,7 +18,7 @@ export default function App() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetchDiagram(prompt);
+      const res = await fetchDiagram(prompt, mode);
       setDiagram(res);
     } catch (err) {
       setError(err.message);
@@ -76,6 +77,39 @@ export default function App() {
             onChange={(e) => setPrompt(e.target.value)}
             placeholder="Describe what you want to visualize... (e.g., 'Create a mind map about project management' or 'Show me a flowchart of the user registration process')"
           />
+          
+          <div style={{ 
+            display: 'flex', 
+            gap: '10px',
+            alignItems: 'center',
+            marginBottom: '10px'
+          }}>
+            <label style={{ fontSize: '16px', color: '#2d3436' }}>Mode:</label>
+            <div style={{ display: 'flex', gap: '15px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="mode"
+                  value="story"
+                  checked={mode === 'story'}
+                  onChange={() => setMode('story')}
+                  style={{ marginRight: '5px' }}
+                />
+                Story Mode
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="mode"
+                  value="general"
+                  checked={mode === 'general'}
+                  onChange={() => setMode('general')}
+                  style={{ marginRight: '5px' }}
+                />
+                General Mode
+              </label>
+            </div>
+          </div>
           
           <button
             onClick={handleSubmit}
