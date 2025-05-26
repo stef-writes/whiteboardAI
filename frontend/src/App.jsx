@@ -8,6 +8,7 @@ export default function App() {
   const [diagram, setDiagram] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [isInputPanelOpen, setIsInputPanelOpen] = useState(true);
 
   const handleSubmit = async () => {
     if (!prompt.trim()) {
@@ -43,114 +44,143 @@ export default function App() {
         zIndex: 1000,
         width: '600px',
         background: 'rgba(255, 255, 255, 0.95)',
-        padding: '20px',
+        padding: isInputPanelOpen ? '20px' : '10px 20px',
         borderRadius: '12px',
         boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-        backdropFilter: 'blur(8px)'
+        backdropFilter: 'blur(8px)',
+        transition: 'all 0.3s ease'
       }}>
-        <h1 style={{ 
-          color: '#2d3436',
-          marginBottom: '20px',
-          textAlign: 'center',
-          fontSize: '24px'
-        }}>
-          Whiteboard AI
-        </h1>
-
         <div style={{
           display: 'flex',
-          gap: '10px',
-          flexDirection: 'column'
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: isInputPanelOpen ? '20px' : '0'
         }}>
-          <textarea
-            rows="3"
-            style={{
-              width: '100%',
-              padding: '12px',
-              borderRadius: '8px',
-              border: '1px solid #dfe6e9',
-              fontSize: '16px',
-              resize: 'none',
-              background: 'rgba(255, 255, 255, 0.9)'
-            }}
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            placeholder="Describe what you want to visualize... (e.g., 'Create a mind map about project management' or 'Show me a flowchart of the user registration process')"
-          />
-          
-          <div style={{ 
-            display: 'flex', 
-            gap: '10px',
-            alignItems: 'center',
-            marginBottom: '10px'
+          <h1 style={{ 
+            color: '#2d3436',
+            margin: '0',
+            textAlign: 'center',
+            fontSize: '24px',
+            flex: 1
           }}>
-            <label style={{ fontSize: '16px', color: '#2d3436' }}>Mode:</label>
-            <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
-              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
-                <input
-                  type="radio"
-                  name="mode"
-                  value="story"
-                  checked={mode === 'story'}
-                  onChange={() => setMode('story')}
-                  style={{ marginRight: '5px' }}
-                />
-                Story Mode
-              </label>
-              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
-                <input
-                  type="radio"
-                  name="mode"
-                  value="general"
-                  checked={mode === 'general'}
-                  onChange={() => setMode('general')}
-                  style={{ marginRight: '5px' }}
-                />
-                General Mode
-              </label>
-              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
-                <input
-                  type="radio"
-                  name="mode"
-                  value="philosophy"
-                  checked={mode === 'philosophy'}
-                  onChange={() => setMode('philosophy')}
-                  style={{ marginRight: '5px' }}
-                />
-                Philosophy Mode
-              </label>
-            </div>
-          </div>
-          
+            Ideation Space
+          </h1>
           <button
-            onClick={handleSubmit}
-            disabled={loading}
+            onClick={() => setIsInputPanelOpen(!isInputPanelOpen)}
             style={{
-              padding: '12px 24px',
-              background: loading ? '#b2bec3' : '#4ecdc4',
-              color: 'white',
+              background: 'none',
               border: 'none',
-              borderRadius: '8px',
-              fontSize: '16px',
-              cursor: loading ? 'not-allowed' : 'pointer',
+              fontSize: '20px',
+              cursor: 'pointer',
+              padding: '5px',
+              borderRadius: '4px',
+              color: '#2d3436',
               transition: 'background 0.2s'
             }}
+            onMouseEnter={(e) => e.target.style.background = 'rgba(0,0,0,0.1)'}
+            onMouseLeave={(e) => e.target.style.background = 'none'}
+            title={isInputPanelOpen ? 'Collapse panel' : 'Expand panel'}
           >
-            {loading ? 'Generating...' : 'Generate Diagram'}
+            {isInputPanelOpen ? '▲' : '▼'}
           </button>
-
-          {error && (
-            <div style={{
-              padding: '12px',
-              background: '#ff7675',
-              color: 'white',
-              borderRadius: '8px',
-              marginTop: '10px'
-            }}>
-              {error}
-            </div>
-          )}
         </div>
+
+        {isInputPanelOpen && (
+          <div style={{
+            display: 'flex',
+            gap: '10px',
+            flexDirection: 'column'
+          }}>
+            <textarea
+              rows="3"
+              style={{
+                width: '100%',
+                padding: '12px',
+                borderRadius: '8px',
+                border: '1px solid #dfe6e9',
+                fontSize: '16px',
+                resize: 'none',
+                background: 'rgba(255, 255, 255, 0.9)'
+              }}
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              placeholder="Describe what you want to visualize... (e.g., 'Create a mind map about project management' or 'Show me a flowchart of the user registration process')"
+            />
+            
+            <div style={{ 
+              display: 'flex', 
+              gap: '10px',
+              alignItems: 'center',
+              marginBottom: '10px'
+            }}>
+              <label style={{ fontSize: '16px', color: '#2d3436' }}>Mode:</label>
+              <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
+                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                  <input
+                    type="radio"
+                    name="mode"
+                    value="story"
+                    checked={mode === 'story'}
+                    onChange={() => setMode('story')}
+                    style={{ marginRight: '5px' }}
+                  />
+                  Story Mode
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                  <input
+                    type="radio"
+                    name="mode"
+                    value="general"
+                    checked={mode === 'general'}
+                    onChange={() => setMode('general')}
+                    style={{ marginRight: '5px' }}
+                  />
+                  General Mode
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                  <input
+                    type="radio"
+                    name="mode"
+                    value="philosophy"
+                    checked={mode === 'philosophy'}
+                    onChange={() => setMode('philosophy')}
+                    style={{ marginRight: '5px' }}
+                  />
+                  Philosophy Mode
+                </label>
+              </div>
+            </div>
+            
+            <button
+              onClick={handleSubmit}
+              disabled={loading}
+              style={{
+                padding: '12px 24px',
+                background: loading ? '#b2bec3' : '#4ecdc4',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '16px',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                transition: 'background 0.2s'
+              }}
+            >
+              {loading ? 'Generating...' : 'Generate Diagram'}
+            </button>
+
+            {error && (
+              <div style={{
+                padding: '12px',
+                background: '#ff7675',
+                color: 'white',
+                borderRadius: '8px',
+                marginTop: '10px'
+              }}>
+                {error}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Full-page diagram container */}
